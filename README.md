@@ -91,11 +91,11 @@ ls -lhS
 On first run, niko automatically sets up shell integration. Restart your terminal, then:
 
 ```bash
-$ n list files<Tab>
-$ ls -la█                # Command appears - edit or press Enter
+$ niko list files<Tab>
+$ ls -la█                # Command replaces your input - edit or press Enter
 ```
 
-Type `n`, your query, press **Tab** - the command appears ready to run.
+Type `niko`, your query, press **Tab** - the command replaces your input, ready to run.
 
 ### Direct Execution
 

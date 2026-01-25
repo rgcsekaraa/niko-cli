@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Tab Completion** - Type `n query<Tab>` and command appears inline
+- **Tab Completion** - Type `niko query<Tab>` and command replaces your input
   - Auto-setup on first run (no manual steps)
   - Works like native shell completion
   - Edit the command or press Enter to run
