@@ -57,15 +57,11 @@ The generated command is printed to stdout for you to review and execute.`,
 
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newVersionCmd())
-	rootCmd.AddCommand(newInitCmd())
 
 	return rootCmd
 }
 
 func runQuery(cmd *cobra.Command, args []string) error {
-	// Auto-setup shell integration on first run
-	checkAndSetupShell()
-
 	query := strings.Join(args, " ")
 
 	// Handle self-referential queries about niko itself
@@ -75,34 +71,6 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	return processQuery(query)
-}
-
-func checkAndSetupShell() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-
-	shell := os.Getenv("SHELL")
-	var rcFile string
-
-	if strings.Contains(shell, "zsh") {
-		rcFile = home + "/.zshrc"
-	} else if strings.Contains(shell, "bash") {
-		rcFile = home + "/.bashrc"
-	} else {
-		return
-	}
-
-	// Check if already installed
-	content, err := os.ReadFile(rcFile)
-	if err != nil || strings.Contains(string(content), "Niko") {
-		return // Already installed or can't read
-	}
-
-	// First run - install and notify
-	setupShellIntegration()
-	fmt.Fprintln(os.Stderr, "")
 }
 
 func handleNikoQuery(query string) error {
@@ -207,12 +175,15 @@ func processQuery(query string) error {
 
 	// Execute directly if -x flag is set
 	if execFlag {
-		fmt.Println(command)
 		return ExecuteCommand(command)
 	}
 
-	// Default: just print the command
-	fmt.Println(command)
+	// Interactive mode: show command with options
+	shouldRun, finalCmd := InteractivePrompt(command)
+	if shouldRun && finalCmd != "" {
+		return ExecuteCommand(finalCmd)
+	}
+
 	return nil
 }
 
@@ -300,9 +271,6 @@ Environment variables (override config file):
 				fmt.Println(cfg.Grok.Model)
 			case "grok.temperature":
 				fmt.Println(cfg.Grok.Temperature)
-			// UI
-			case "ui.interactive":
-				fmt.Println(cfg.UI.Interactive)
 			default:
 				return fmt.Errorf("unknown key: %s\nRun 'niko config show' to see available options", key)
 			}
@@ -339,9 +307,7 @@ Available keys:
 
   grok.api_key            Grok API key
   grok.model              Grok model (grok-2-latest, etc.)
-  grok.temperature        Temperature for generation (0.0-1.0)
-
-  ui.interactive          Enable interactive mode (true|false)`,
+  grok.temperature        Temperature for generation (0.0-1.0)`,
 		Example: `  niko config set provider openai
   niko config set openai.api_key sk-xxx
   niko config set local.model llama3.2:3b
@@ -427,93 +393,3 @@ func localStatus(cfg *config.Config) string {
 	return "running (" + cfg.Local.Model + ")"
 }
 
-func newInitCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "init",
-		Short: "Setup shell integration",
-		Long: `Sets up tab-completion style integration.
-
-After setup, type 'niko' followed by your query and press Tab:
-  $ niko list files<Tab>
-  $ ls -la█   <-- command appears, ready to edit/run`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return setupShellIntegration()
-		},
-	}
-}
-
-func setupShellIntegration() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	shell := os.Getenv("SHELL")
-	var rcFile string
-	var shellCode string
-
-	if strings.Contains(shell, "zsh") {
-		rcFile = home + "/.zshrc"
-		shellCode = `
-# Niko - press Tab after 'niko your query' to get the command
-_niko_complete() {
-    if [[ "$LBUFFER" == niko\ * ]]; then
-        local query="${LBUFFER#niko }"
-        local cmd=$(niko "$query" 2>/dev/null)
-        if [ -n "$cmd" ]; then
-            LBUFFER="$cmd"
-            zle redisplay
-        fi
-    else
-        zle expand-or-complete
-    fi
-}
-zle -N _niko_complete
-bindkey '^I' _niko_complete
-`
-	} else if strings.Contains(shell, "bash") {
-		rcFile = home + "/.bashrc"
-		shellCode = `
-# Niko - press Tab after 'niko your query' to get the command
-_niko_complete() {
-    if [[ "$READLINE_LINE" == niko\ * ]]; then
-        local query="${READLINE_LINE#niko }"
-        local cmd=$(niko "$query" 2>/dev/null)
-        if [ -n "$cmd" ]; then
-            READLINE_LINE="$cmd"
-            READLINE_POINT=${#cmd}
-        fi
-    fi
-}
-bind -x '"\t": _niko_complete'
-`
-	} else {
-		fmt.Println("Unsupported shell. Manual setup required.")
-		return nil
-	}
-
-	// Check if already installed
-	content, err := os.ReadFile(rcFile)
-	if err == nil && strings.Contains(string(content), "Niko") {
-		fmt.Println("Already installed!")
-		fmt.Println("\nUsage: niko list files<Tab>")
-		return nil
-	}
-
-	// Append to rc file
-	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if _, err := f.WriteString(shellCode); err != nil {
-		return err
-	}
-
-	fmt.Printf("Installed to %s\n\n", rcFile)
-	fmt.Println("Restart your terminal, then:")
-	fmt.Println("  niko list files<Tab>")
-
-	return nil
-}
