@@ -119,8 +119,14 @@ func processQuery(query string) error {
 	systemPrompt := prompt.BuildSystemPrompt(sysCtx)
 	userPrompt := prompt.BuildUserPrompt(query)
 
+	// Show spinner while generating
+	spinner := NewSpinner("Thinking...")
+	spinner.Start()
+
 	start := time.Now()
 	response, err := provider.Generate(ctx, systemPrompt, userPrompt)
+	spinner.Stop()
+
 	if err != nil {
 		return fmt.Errorf("generation failed: %w", err)
 	}
