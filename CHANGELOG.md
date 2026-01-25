@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Shell Integration** - Command appears at your actual shell prompt ready to edit/run
-  - Add `n()` function to your `.zshrc` or `.bashrc`
+  - Run `niko init` to auto-setup (adds `n` function to your shell)
   - Use `n "query"` and command appears at prompt with cursor
   - Edit naturally with arrow keys, or press Enter to run
 - **Direct Execution** - New `-x` flag to execute command immediately

@@ -90,23 +90,13 @@ That's it. Copy and paste, or use **shell integration** (recommended):
 
 ### Shell Integration (Recommended)
 
-Add to your `~/.zshrc`:
+Run once to setup:
 ```bash
-n() {
-    local cmd=$(niko "$@" 2>/dev/null)
-    [ -n "$cmd" ] && print -z "$cmd"
-}
+niko init
+source ~/.zshrc  # or ~/.bashrc
 ```
 
-Or for `~/.bashrc`:
-```bash
-n() {
-    local cmd=$(niko "$@" 2>/dev/null)
-    [ -n "$cmd" ] && { READLINE_LINE="$cmd"; READLINE_POINT=${#cmd}; }
-}
-```
-
-Then reload your shell (`source ~/.zshrc`) and use `n`:
+Now use `n` instead of `niko`:
 ```bash
 $ n list files by size
 $ ls -lhS█   # Command appears at prompt - edit or press Enter to run

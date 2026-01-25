@@ -57,6 +57,7 @@ The generated command is printed to stdout for you to review and execute.`,
 
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newVersionCmd())
+	rootCmd.AddCommand(newInitCmd())
 
 	return rootCmd
 }
@@ -393,4 +394,88 @@ func localStatus(cfg *config.Config) string {
 		return "ready"
 	}
 	return "running (" + cfg.Local.Model + ")"
+}
+
+func newInitCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init",
+		Short: "Setup shell integration",
+		Long: `Adds the 'n' function to your shell config for seamless usage.
+
+After running this command, use 'n' instead of 'niko':
+  $ n list files
+  $ ls -la█   <-- command appears at your prompt, ready to edit/run`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return setupShellIntegration()
+		},
+	}
+}
+
+func setupShellIntegration() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	shell := os.Getenv("SHELL")
+	var rcFile string
+	var shellFunc string
+
+	if strings.Contains(shell, "zsh") {
+		rcFile = home + "/.zshrc"
+		shellFunc = `
+# Niko shell integration
+n() {
+    local cmd=$(niko "$@" 2>/dev/null)
+    [ -n "$cmd" ] && print -z "$cmd"
+}
+`
+	} else if strings.Contains(shell, "bash") {
+		rcFile = home + "/.bashrc"
+		shellFunc = `
+# Niko shell integration
+n() {
+    local cmd=$(niko "$@" 2>/dev/null)
+    if [ -n "$cmd" ]; then
+        READLINE_LINE="$cmd"
+        READLINE_POINT=${#cmd}
+    fi
+}
+`
+	} else {
+		fmt.Println("Shell not supported for auto-setup. Add manually to your shell config:")
+		fmt.Println(`
+n() {
+    local cmd=$(niko "$@" 2>/dev/null)
+    [ -n "$cmd" ] && print -z "$cmd"
+}`)
+		return nil
+	}
+
+	// Check if already installed
+	content, err := os.ReadFile(rcFile)
+	if err == nil && strings.Contains(string(content), "Niko shell integration") {
+		fmt.Printf("Shell integration already installed in %s\n", rcFile)
+		fmt.Println("\nUsage: n \"your query\"")
+		return nil
+	}
+
+	// Append to rc file
+	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(shellFunc); err != nil {
+		return err
+	}
+
+	fmt.Printf("Added shell integration to %s\n", rcFile)
+	fmt.Println("\nRun this to activate:")
+	fmt.Printf("  source %s\n", rcFile)
+	fmt.Println("\nThen use:")
+	fmt.Println("  n \"list files\"")
+
+	return nil
 }
