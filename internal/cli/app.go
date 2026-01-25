@@ -160,17 +160,17 @@ func processQuery(query string) error {
 		fmt.Println()
 	}
 
-	// Print command in green and copy to clipboard
-	green := color.New(color.FgGreen)
-	green.Println(command)
+	// Print command and copy to clipboard
+	fmt.Println(command)
 	CopyToClipboard(command)
 
-	// Show warning after command if dangerous
+	// Show subtle warning if dangerous
 	risk := executor.AssessRisk(command)
+	dim := color.New(color.Faint)
 	if risk == executor.Critical {
-		red.Println("DANGER: This command is destructive!")
+		dim.Println("(destructive command)")
 	} else if risk == executor.Dangerous {
-		yellow.Println("WARNING: Review before running")
+		dim.Println("(review before running)")
 	}
 
 	return nil
