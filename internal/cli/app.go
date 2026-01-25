@@ -170,10 +170,7 @@ func processQuery(query string) error {
 
 	// Print command and copy to clipboard
 	fmt.Println(command)
-	if err := CopyToClipboard(command); err == nil {
-		dim := color.New(color.Faint)
-		dim.Println("Copied to clipboard")
-	}
+	CopyToClipboard(command)
 
 	return nil
 }
