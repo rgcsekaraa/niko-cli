@@ -86,15 +86,11 @@ $ niko "list files by size"
 
   ⠹ Thinking...
 
-  ls -lhS
+  ls -lhS  ⏎
 
-  [Enter] Run  [e] Edit  [Esc/q] Cancel
 ```
 
-**Interactive Controls:**
-- **Enter** - Execute the command immediately
-- **e** or **Tab** - Edit the command before running
-- **Esc** or **q** - Cancel
+Press **Enter** to run, **Tab** to edit, **Esc** to cancel.
 
 ```bash
 # More examples

@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Interactive Mode** - Commands now show with options to run, edit, or cancel:
-  - Press **Enter** to execute immediately
-  - Press **e** or **Tab** to edit before running
+- **Interactive Mode** - Commands show with a subtle `⏎` prompt:
+  - Press **Enter** to run
+  - Press **Tab** or **e** to edit (with full arrow key/backspace support)
   - Press **Esc** or **q** to cancel
 - **Loading Spinner** - Shows animated "Thinking..." while generating commands
 - Configurable via `niko config set ui.interactive true/false`
