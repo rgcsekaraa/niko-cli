@@ -27,6 +27,7 @@ var (
 
 	providerFlag string
 	verboseFlag  bool
+	execFlag     bool
 )
 
 func NewRootCmd() *cobra.Command {
@@ -52,6 +53,7 @@ The generated command is printed to stdout for you to review and execute.`,
 
 	rootCmd.Flags().StringVarP(&providerFlag, "provider", "p", "", "override default provider (local|openai|claude|deepseek|grok)")
 	rootCmd.Flags().BoolVarP(&verboseFlag, "verbose", "v", false, "show debug information")
+	rootCmd.Flags().BoolVarP(&execFlag, "exec", "x", false, "execute the command directly")
 
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newVersionCmd())
@@ -160,24 +162,24 @@ func processQuery(query string) error {
 		fmt.Println()
 	}
 
-	// Check for dangerous commands and warn BEFORE showing command
+	// Check for dangerous commands
 	risk := executor.AssessRisk(command)
 	if risk == executor.Critical {
-		red.Println("\nDANGER: This command is destructive!")
-	} else if risk == executor.Dangerous {
-		yellow.Println("\nWARNING: Review before running")
-	}
-
-	// Interactive mode: show command in shell-like prompt
-	if cfg.UI.Interactive {
-		result, finalCommand := InteractivePrompt(command)
-		if result == ResultRun && finalCommand != "" {
-			return ExecuteCommand(finalCommand)
-		}
+		red.Fprintln(os.Stderr, "DANGER: This command is destructive!")
+		fmt.Println(command)
 		return nil
 	}
+	if risk == executor.Dangerous {
+		yellow.Fprintln(os.Stderr, "WARNING: Review before running")
+	}
 
-	// Non-interactive: just print the command
+	// Execute directly if -x flag is set
+	if execFlag {
+		fmt.Println(command)
+		return ExecuteCommand(command)
+	}
+
+	// Default: just print the command
 	fmt.Println(command)
 	return nil
 }
