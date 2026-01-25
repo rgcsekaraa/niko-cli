@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
-	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"golang.org/x/term"
 )
@@ -35,11 +35,9 @@ func InteractivePrompt(command string) (InteractiveResult, string) {
 		return ResultCancel, command
 	}
 
-	fmt.Println()
-	cyan.Printf("  %s\n", command)
-	fmt.Println()
-	dim.Println("  [Enter] Run  [e] Edit  [Esc/q] Cancel")
-	fmt.Println()
+	// Clean, minimal output - just the command with a run prompt
+	fmt.Printf("\n  %s", command)
+	dim.Print("  ⏎\n\n")
 
 	// Read single keypress
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
@@ -62,9 +60,12 @@ func InteractivePrompt(command string) (InteractiveResult, string) {
 	case buf[0] == 13 || buf[0] == 10: // Enter
 		return ResultRun, command
 	case buf[0] == 'e' || buf[0] == 'E' || buf[0] == 9: // 'e' or Tab
-		return ResultEdit, editCommand(command)
+		edited := editCommand(command)
+		if edited != "" {
+			return ResultEdit, edited
+		}
+		return ResultCancel, command
 	case buf[0] == 27 || buf[0] == 'q' || buf[0] == 'Q' || buf[0] == 3: // Esc, q, or Ctrl+C
-		dim.Println("  Cancelled")
 		return ResultCancel, command
 	default:
 		// Any other key, treat as cancel
@@ -72,29 +73,33 @@ func InteractivePrompt(command string) (InteractiveResult, string) {
 	}
 }
 
-// editCommand lets the user edit the command inline
+// editCommand lets the user edit the command with full readline support
 func editCommand(command string) string {
-	fmt.Print("  Edit: ")
-
-	// Pre-fill with the command using ANSI escape codes
-	fmt.Print(command)
-
-	// Move cursor to end and enable line editing
-	reader := bufio.NewReader(os.Stdin)
-
-	// Clear the pre-filled text and let user type
-	fmt.Print("\r  Edit: ")
-
-	line, err := reader.ReadString('\n')
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          "  Edit: ",
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
 	if err != nil {
 		return command
 	}
+	defer rl.Close()
 
-	edited := strings.TrimSpace(line)
-	if edited == "" {
+	// Pre-fill the line with the command
+	rl.WriteStdin([]byte(command))
+
+	line, err := rl.Readline()
+	if err != nil {
+		if err == readline.ErrInterrupt || err == io.EOF {
+			return ""
+		}
 		return command
 	}
-	return edited
+
+	if line == "" {
+		return command
+	}
+	return line
 }
 
 // ExecuteCommand runs the command in the user's shell
