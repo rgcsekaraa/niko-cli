@@ -27,7 +27,6 @@ var (
 
 	providerFlag string
 	verboseFlag  bool
-	execFlag     bool
 )
 
 func NewRootCmd() *cobra.Command {
@@ -53,7 +52,6 @@ The generated command is printed to stdout for you to review and execute.`,
 
 	rootCmd.Flags().StringVarP(&providerFlag, "provider", "p", "", "override default provider (local|openai|claude|deepseek|grok)")
 	rootCmd.Flags().BoolVarP(&verboseFlag, "verbose", "v", false, "show debug information")
-	rootCmd.Flags().BoolVarP(&execFlag, "exec", "x", false, "execute the command directly")
 
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newVersionCmd())
@@ -166,22 +164,15 @@ func processQuery(query string) error {
 	risk := executor.AssessRisk(command)
 	if risk == executor.Critical {
 		red.Fprintln(os.Stderr, "DANGER: This command is destructive!")
-		fmt.Println(command)
-		return nil
-	}
-	if risk == executor.Dangerous {
+	} else if risk == executor.Dangerous {
 		yellow.Fprintln(os.Stderr, "WARNING: Review before running")
 	}
 
-	// Execute directly if -x flag is set
-	if execFlag {
-		return ExecuteCommand(command)
-	}
-
-	// Interactive mode: show command with options
-	shouldRun, finalCmd := InteractivePrompt(command)
-	if shouldRun && finalCmd != "" {
-		return ExecuteCommand(finalCmd)
+	// Print command and copy to clipboard
+	fmt.Println(command)
+	if err := CopyToClipboard(command); err == nil {
+		dim := color.New(color.Faint)
+		dim.Println("Copied to clipboard")
 	}
 
 	return nil

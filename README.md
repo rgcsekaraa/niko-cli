@@ -4,16 +4,14 @@
 
 ```bash
 $ niko "find all files larger than 100MB"
-
 find . -type f -size +100M
-
-[Tab] edit   [Enter] run   [Ctrl+C] cancel
+Copied to clipboard
 ```
 
 ## Features
 
 - **Free & Offline** - Runs locally with Ollama, no API keys required
-- **Interactive** - Edit, run, or cancel commands before execution
+- **Clipboard** - Command automatically copied, just paste to run
 - **Smart** - Auto-selects the best model based on your RAM
 - **Safe** - Warns about dangerous commands
 - **Cross-platform** - macOS, Linux, Windows
@@ -39,15 +37,11 @@ go install github.com/niko-cli/niko/cmd/niko@latest
 
 ```bash
 $ niko "list files by size"
-
 ls -lhS
+Copied to clipboard
 
-[Tab] edit   [Enter] run   [Ctrl+C] cancel
+$ # Now just paste (Cmd+V / Ctrl+V) and run
 ```
-
-- **Enter** - Run the command
-- **Tab** - Edit the command first
-- **Ctrl+C** - Cancel
 
 ### Examples
 
@@ -60,14 +54,7 @@ niko "kill process on port 3000"
 niko "git commits from last week"
 ```
 
-### Direct Execution
-
-Skip the prompt with `-x`:
-```bash
-niko -x "list files"
-```
-
-### Use Cloud Providers
+### Cloud Providers
 
 ```bash
 niko -p openai "complex kubernetes deployment"
@@ -78,21 +65,11 @@ niko -p deepseek "database migration script"
 ## Configuration
 
 ```bash
-niko config show          # Show all settings
+niko config show
 niko config set provider deepseek
 niko config set deepseek.api_key sk-xxx
 niko config set local.model qwen2.5-coder:7b
 ```
-
-### Providers
-
-| Provider | Setup |
-|----------|-------|
-| Local (default) | Works out of the box |
-| DeepSeek | `niko config set provider deepseek` |
-| OpenAI | `niko config set provider openai` |
-| Claude | `niko config set provider claude` |
-| Grok | `niko config set provider grok` |
 
 ### Local Models
 

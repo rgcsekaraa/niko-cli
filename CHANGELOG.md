@@ -1,40 +1,23 @@
 # Changelog
 
-## [1.4.0] - 2025-01-26
-
-### Added
-- **Interactive prompt** - Shows command with options:
-  - `[Tab]` to edit
-  - `[Enter]` to run
-  - `[Ctrl+C]` to cancel
-- **Loading spinner** - Shows "Thinking..." while generating
-- **Direct execution** - Use `-x` flag to run immediately
+## [1.5.0] - 2025-01-26
 
 ### Changed
-- Simplified UX - clean, intuitive command flow
-- Cleaner README
+- **Simplified UX** - Command prints and copies to clipboard automatically
+- Just paste (Cmd+V / Ctrl+V) to run
+- Removed interactive prompt complexity
 
 ## [1.2.0] - 2025-01-25
 
 ### Added
-- **Auto-select model based on RAM**
-  - 8GB+ → qwen2.5-coder:7b
-  - 4-8GB → qwen2.5-coder:3b
-  - <4GB → qwen2.5-coder:1.5b
-
-### Changed
-- Simplified prompt for better accuracy
-- Tuned generation parameters
+- Auto-select model based on RAM
+- Loading spinner while generating
 
 ## [1.1.0] - 2025-01-25
 
 ### Changed
 - Upgraded to qwen2.5-coder:7b by default
-- Switched to chat API for better instruction following
-
-### Added
-- Welcome screen on first run
-- macOS-specific command support
+- Switched to chat API
 
 ## [1.0.0] - 2025-01-24
 
@@ -42,5 +25,5 @@
 - Natural language to shell command translation
 - Local LLM support with Ollama
 - Cloud providers: OpenAI, Claude, DeepSeek, Grok
-- Safety features and warnings
+- Safety warnings
 - Cross-platform support
