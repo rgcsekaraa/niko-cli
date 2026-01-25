@@ -9,15 +9,17 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/niko-cli/niko/internal/config"
+	"github.com/pbnjay/memory"
 )
 
 const (
-	DefaultModel     = "qwen2.5-coder:7b" // Best accuracy
-	FallbackModel    = "qwen2.5-coder:3b" // Fallback if 7b fails
+	DefaultModel     = "qwen2.5-coder:1.5b" // Base model, fastest
+	FallbackModel    = "qwen2.5-coder:1.5b" // Fallback
 	OllamaDefaultURL = "http://127.0.0.1:11434"
 )
 
@@ -111,12 +113,12 @@ func (p *LocalProvider) Generate(ctx context.Context, systemPrompt, userPrompt s
 		"messages": messages,
 		"stream":   false,
 		"options": map[string]interface{}{
-			"temperature":    p.temperature,
-			"num_predict":    150,
-			"top_p":          0.85,
-			"top_k":          40,
-			"repeat_penalty": 1.15,
-			"stop":           []string{"\n\n", "```", "Explanation:", "Note:"},
+			"temperature":    0.0,  // Deterministic for accurate commands
+			"num_predict":    100,  // Commands are short
+			"top_p":          0.7,  // More focused sampling
+			"top_k":          20,   // Limit vocabulary for precision
+			"repeat_penalty": 1.2,  // Avoid repetition
+			"stop":           []string{"\n", "```", "Explanation:", "Note:", "#", "//"},
 		},
 	}
 
@@ -273,11 +275,34 @@ func (p *LocalProvider) EnsureModelExists(ctx context.Context) error {
 	return nil
 }
 
+// selectModelByRAM picks the best model based on available system RAM
+func selectModelByRAM() string {
+	totalRAM := memory.TotalMemory()
+	ramGB := totalRAM / (1024 * 1024 * 1024)
+
+	// Model RAM requirements:
+	// 7b: needs 6GB+ RAM
+	// 3b: needs 4GB+ RAM
+	// 1.5b: needs 3GB+ RAM (fallback)
+	if ramGB >= 8 {
+		return "qwen2.5-coder:7b"
+	} else if ramGB >= 4 {
+		return "qwen2.5-coder:3b"
+	}
+	return "qwen2.5-coder:1.5b"
+}
+
 func (p *LocalProvider) selectModel() (string, error) {
+	selectedModel := selectModelByRAM()
+	totalRAM := memory.TotalMemory()
+	ramGB := totalRAM / (1024 * 1024 * 1024)
+
 	fmt.Println()
 	fmt.Println("┌─────────────────────────────────────────────────────────────────┐")
 	fmt.Println("│                    Welcome to Niko                              │")
 	fmt.Println("└─────────────────────────────────────────────────────────────────┘")
+	fmt.Println()
+	fmt.Printf("Detected: %dGB RAM, %d CPU cores\n", ramGB, runtime.NumCPU())
 	fmt.Println()
 	fmt.Println("Local Models (free, runs on your machine):")
 	fmt.Println()
@@ -285,7 +310,7 @@ func (p *LocalProvider) selectModel() (string, error) {
 	fmt.Println("  ─────────────────────────────────────────────────────────────")
 	for _, opt := range availableModels {
 		marker := "  "
-		if opt.Number == "1" {
+		if opt.Model == selectedModel {
 			marker = "► "
 		}
 		fmt.Printf("  %s%-19s %-8s %-8s %-9s %s\n",
@@ -303,11 +328,11 @@ func (p *LocalProvider) selectModel() (string, error) {
 	fmt.Println()
 	fmt.Println("─────────────────────────────────────────────────────────────────")
 	fmt.Println()
-	fmt.Printf("Using default: %s\n", availableModels[0].Model)
+	fmt.Printf("Auto-selected: %s (based on your RAM)\n", selectedModel)
 	fmt.Println("Change later: niko config set local.model <model>")
 	fmt.Println()
 
-	return availableModels[0].Model, nil
+	return selectedModel, nil
 }
 
 func (p *LocalProvider) hasModel(ctx context.Context, model string) bool {

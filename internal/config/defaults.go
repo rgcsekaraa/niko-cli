@@ -11,7 +11,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Provider: "local", // Local Ollama by default - free and fast
 		Local: LocalConfig{
-			Model:       "qwen2.5-coder:7b", // Best accuracy for shell commands
+			Model:       "qwen2.5-coder:1.5b", // Base model, fastest
 			URL:         "http://127.0.0.1:11434",
 			Threads:     threads,
 			ContextSize: 4096,
