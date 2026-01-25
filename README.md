@@ -18,7 +18,7 @@ git log --since="2 weeks ago" --stat
 ## Features
 
 - **Free & Offline** - Runs locally, no API keys required
-- **Interactive Mode** - Run, edit, or cancel commands before execution
+- **Shell Integration** - Command appears at your prompt, ready to edit/run
 - **Smart Model Selection** - Auto-selects the best model based on your RAM
 - **Safe** - Warns about dangerous commands, blocks harmful requests
 - **Cross-platform** - macOS, Linux, Windows
@@ -83,28 +83,55 @@ The selected model downloads automatically (one-time). After setup, everything r
 
 ```bash
 $ niko "list files by size"
-
-  ⠹ Thinking...
-
-  ls -lhS  ⏎
-
+ls -lhS
 ```
 
-Press **Enter** to run, **Tab** to edit, **Esc** to cancel.
+That's it. Copy and paste, or use **shell integration** (recommended):
+
+### Shell Integration (Recommended)
+
+Add to your `~/.zshrc`:
+```bash
+n() {
+    local cmd=$(niko "$@" 2>/dev/null)
+    [ -n "$cmd" ] && print -z "$cmd"
+}
+```
+
+Or for `~/.bashrc`:
+```bash
+n() {
+    local cmd=$(niko "$@" 2>/dev/null)
+    [ -n "$cmd" ] && { READLINE_LINE="$cmd"; READLINE_POINT=${#cmd}; }
+}
+```
+
+Then reload your shell (`source ~/.zshrc`) and use `n`:
+```bash
+$ n list files by size
+$ ls -lhS█   # Command appears at prompt - edit or press Enter to run
+```
+
+### Direct Execution
+
+Use `-x` to execute immediately:
+```bash
+$ niko -x "list files"
+ls -la
+<output appears here>
+```
+
+### More Examples
 
 ```bash
-# More examples
 niko "find python files modified today"
 niko "show top 10 processes by memory"
 niko "compress logs folder to tar.gz"
 niko "search for TODO in all js files"
 
-# Use a cloud provider for a single query
+# Use a cloud provider
 niko -p openai "complex kubernetes deployment"
 niko -p claude "optimize this dockerfile"
-
-# Debug mode
-niko -v "your query"
 ```
 
 ## Safety
@@ -172,16 +199,6 @@ export DEEPSEEK_API_KEY=sk-xxx
 export OPENAI_API_KEY=sk-xxx
 export ANTHROPIC_API_KEY=sk-ant-xxx
 export GROK_API_KEY=xai-xxx
-```
-
-### Interactive Mode
-
-```bash
-# Disable interactive mode (just print command, don't prompt)
-niko config set ui.interactive false
-
-# Enable interactive mode (default)
-niko config set ui.interactive true
 ```
 
 ### Advanced

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-01-26
+
+### Added
+
+- **Shell Integration** - Command appears at your actual shell prompt ready to edit/run
+  - Add `n()` function to your `.zshrc` or `.bashrc`
+  - Use `n "query"` and command appears at prompt with cursor
+  - Edit naturally with arrow keys, or press Enter to run
+- **Direct Execution** - New `-x` flag to execute command immediately
+- **Loading Spinner** - Shows animated "Thinking..." while generating commands
+
+### Changed
+
+- Simplified output - just prints the command cleanly
+- Removed complex interactive mode in favor of shell integration
+
 ## [1.3.0] - 2025-01-25
 
 ### Added
@@ -15,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Press **Enter** to run
   - Press **Tab** or **e** to edit (with full arrow key/backspace support)
   - Press **Esc** or **q** to cancel
-- **Loading Spinner** - Shows animated "Thinking..." while generating commands
 - Configurable via `niko config set ui.interactive true/false`
 
 ## [1.2.0] - 2025-01-25
