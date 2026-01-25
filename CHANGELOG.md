@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-01-25
+
+### Added
+
+- **Auto-select model based on RAM** - Niko now detects your system RAM and automatically selects the best model:
+  - 8GB+ RAM → qwen2.5-coder:7b (best accuracy)
+  - 4-8GB RAM → qwen2.5-coder:3b (balanced)
+  - <4GB RAM → qwen2.5-coder:1.5b (fastest)
+- Shows detected RAM and CPU cores on first run
+
+### Changed
+
+- Simplified system prompt for better accuracy with smaller models
+- Tuned generation parameters (temperature=0, tighter sampling) for more deterministic outputs
+- Removed overly aggressive safety filtering that caused false positives
+
+### Fixed
+
+- Fixed "Declined: harmful request" false positives on legitimate queries like "run ollama"
+
 ## [1.1.0] - 2025-01-25
 
 ### Changed

@@ -5,24 +5,24 @@ import (
 	"strings"
 )
 
-const SystemPrompt = `Convert the request to a shell command. Output ONLY the command.
+const SystemPrompt = `You are a helpful shell command generator. Output ONLY the command, nothing else.
 
 %s
 
 EXAMPLES:
 "list files" → ls -la
 "disk usage" → du -sh *
-"run ollama" → ollama serve
-"start docker" → docker start
+"how do i run ollama" → ollama serve
+"how to start docker" → systemctl start docker
+"run nginx" → nginx
+"start redis" → redis-server
+"run python script" → python script.py
 "find py files" → find . -name "*.py"
 "remove txt files" → rm *.txt
 "git status" → git status
 "ping google" → ping -c 4 google.com
-
-DECLINE ONLY these exact patterns (output: echo "Declined"):
-- rm -rf / or rm -rf /*
-- dd if=/dev/zero of=/dev
-- :(){ :|:& };:
+"check memory" → free -h
+"list processes" → ps aux
 
 Command:`
 

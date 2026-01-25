@@ -18,9 +18,9 @@ git log --since="2 weeks ago" --stat
 ## Features
 
 - **Free & Offline** - Runs locally, no API keys required
-- **Accurate** - Uses qwen2.5-coder:7b model optimized for shell commands
+- **Smart Model Selection** - Auto-selects the best model based on your RAM
 - **Safe** - Warns about dangerous commands, blocks harmful requests
-- **Fast** - Responses in 1-3 seconds
+- **Fast** - Optimized for quick responses
 - **Cross-platform** - macOS, Linux, Windows
 
 ---
@@ -50,34 +50,32 @@ go install github.com/niko-cli/niko/cmd/niko@latest
 niko "list files"
 ```
 
-On first run, you'll see a welcome screen:
+On first run, Niko detects your system and auto-selects the best model:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Welcome to Niko                              │
 └─────────────────────────────────────────────────────────────────┘
 
+Detected: 16GB RAM, 8 CPU cores
+
 Local Models (free, runs on your machine):
 
   Model                 Size     RAM      Speed     Accuracy
   ─────────────────────────────────────────────────────────────
-  ►qwen2.5-coder:7b     4GB      6GB      Normal    Best
-   qwen2.5-coder:3b     2GB      4GB      Fast      Good
-   qwen2.5-coder:1.5b   1GB      3GB      Fastest   Basic
+► qwen2.5-coder:7b      4GB      6GB      Normal    Best
+  qwen2.5-coder:3b      2GB      4GB      Fast      Good
+  qwen2.5-coder:1.5b    1GB      3GB      Fastest   Basic
 
-Cloud Providers (need API key, more accurate):
-
-  Provider     Model                  Setup
-  ─────────────────────────────────────────────────────────────
-  DeepSeek     deepseek-chat          niko config set provider deepseek
-  OpenAI       gpt-4o-mini            niko config set provider openai
-  Claude       claude-3-5-haiku       niko config set provider claude
-  Grok         grok-2-latest          niko config set provider grok
-
-Using default: qwen2.5-coder:7b
+Auto-selected: qwen2.5-coder:7b (based on your RAM)
 ```
 
-The default 7b model downloads automatically (~4GB, one-time). After setup, everything runs offline.
+**Auto-selection based on RAM:**
+- **8GB+ RAM** → 7b model (best accuracy)
+- **4-8GB RAM** → 3b model (balanced)
+- **<4GB RAM** → 1.5b model (fastest)
+
+The selected model downloads automatically (one-time). After setup, everything runs offline.
 
 ---
 
@@ -105,15 +103,9 @@ niko -v "your query"
 
 ## Safety
 
-Niko protects against harmful commands:
+Niko warns about dangerous commands:
 
 ```bash
-$ niko "delete everything on the system"
-Declined: harmful request
-
-$ niko "format the hard drive"
-Declined: harmful request
-
 $ niko "recursively delete node_modules"
 WARNING: Review before running
 
@@ -121,10 +113,10 @@ find . -type d -name 'node_modules' -prune -exec rm -rf {} +
 ```
 
 **Risk Levels:**
-- **Safe** - Read-only commands (ls, cat, grep)
+- **Safe** - Read-only commands (ls, cat, grep) - runs directly
 - **Moderate** - State-changing commands (git commit, docker run)
 - **Dangerous** - Destructive commands (rm, docker rm) - shows WARNING
-- **Critical** - System-destroying commands - blocked entirely
+- **Critical** - System-destroying commands (rm -rf /) - blocked entirely
 
 ---
 
