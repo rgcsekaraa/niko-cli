@@ -163,25 +163,16 @@ func processQuery(query string) error {
 	// Check for dangerous commands and warn BEFORE showing command
 	risk := executor.AssessRisk(command)
 	if risk == executor.Critical {
-		red.Println("DANGER: This command is destructive!")
-		fmt.Println()
+		red.Println("\nDANGER: This command is destructive!")
 	} else if risk == executor.Dangerous {
-		yellow.Println("WARNING: Review before running")
-		fmt.Println()
+		yellow.Println("\nWARNING: Review before running")
 	}
 
-	// Interactive mode: show command and wait for user action
+	// Interactive mode: show command in shell-like prompt
 	if cfg.UI.Interactive {
 		result, finalCommand := InteractivePrompt(command)
-		switch result {
-		case ResultRun:
+		if result == ResultRun && finalCommand != "" {
 			return ExecuteCommand(finalCommand)
-		case ResultEdit:
-			if finalCommand != "" {
-				return ExecuteCommand(finalCommand)
-			}
-		case ResultCancel:
-			return nil
 		}
 		return nil
 	}
