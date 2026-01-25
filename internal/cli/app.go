@@ -63,6 +63,9 @@ The generated command is printed to stdout for you to review and execute.`,
 }
 
 func runQuery(cmd *cobra.Command, args []string) error {
+	// Auto-setup shell integration on first run
+	checkAndSetupShell()
+
 	query := strings.Join(args, " ")
 
 	// Handle self-referential queries about niko itself
@@ -72,6 +75,34 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	return processQuery(query)
+}
+
+func checkAndSetupShell() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	shell := os.Getenv("SHELL")
+	var rcFile string
+
+	if strings.Contains(shell, "zsh") {
+		rcFile = home + "/.zshrc"
+	} else if strings.Contains(shell, "bash") {
+		rcFile = home + "/.bashrc"
+	} else {
+		return
+	}
+
+	// Check if already installed
+	content, err := os.ReadFile(rcFile)
+	if err != nil || strings.Contains(string(content), "Niko") {
+		return // Already installed or can't read
+	}
+
+	// First run - install and notify
+	setupShellIntegration()
+	fmt.Fprintln(os.Stderr, "")
 }
 
 func handleNikoQuery(query string) error {
@@ -400,11 +431,11 @@ func newInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Setup shell integration",
-		Long: `Adds the 'n' function to your shell config for seamless usage.
+		Long: `Sets up tab-completion style integration.
 
-After running this command, use 'n' instead of 'niko':
-  $ n list files
-  $ ls -la█   <-- command appears at your prompt, ready to edit/run`,
+After setup, type 'n' followed by your query and press Tab:
+  $ n list files<Tab>
+  $ ls -la█   <-- command appears, ready to edit/run`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return setupShellIntegration()
 		},
@@ -419,44 +450,54 @@ func setupShellIntegration() error {
 
 	shell := os.Getenv("SHELL")
 	var rcFile string
-	var shellFunc string
+	var shellCode string
 
 	if strings.Contains(shell, "zsh") {
 		rcFile = home + "/.zshrc"
-		shellFunc = `
-# Niko shell integration
-n() {
-    local cmd=$(niko "$@" 2>/dev/null)
-    [ -n "$cmd" ] && print -z "$cmd"
+		shellCode = `
+# Niko - press Tab after 'n your query' to get the command
+_niko_complete() {
+    if [[ "$LBUFFER" == n\ * ]]; then
+        local query="${LBUFFER#n }"
+        local cmd=$(niko "$query" 2>/dev/null)
+        if [ -n "$cmd" ]; then
+            LBUFFER="$cmd"
+            zle redisplay
+        fi
+    else
+        zle expand-or-complete
+    fi
 }
+zle -N _niko_complete
+bindkey '^I' _niko_complete
 `
 	} else if strings.Contains(shell, "bash") {
 		rcFile = home + "/.bashrc"
-		shellFunc = `
-# Niko shell integration
+		shellCode = `
+# Niko - type 'n your query' and press Enter
 n() {
     local cmd=$(niko "$@" 2>/dev/null)
     if [ -n "$cmd" ]; then
-        READLINE_LINE="$cmd"
-        READLINE_POINT=${#cmd}
+        history -s "$cmd"
+        read -e -i "$cmd" -p "" edited
+        eval "$edited"
     fi
 }
 `
 	} else {
-		fmt.Println("Shell not supported for auto-setup. Add manually to your shell config:")
-		fmt.Println(`
-n() {
-    local cmd=$(niko "$@" 2>/dev/null)
-    [ -n "$cmd" ] && print -z "$cmd"
-}`)
+		fmt.Println("Unsupported shell. Manual setup required.")
 		return nil
 	}
 
 	// Check if already installed
 	content, err := os.ReadFile(rcFile)
-	if err == nil && strings.Contains(string(content), "Niko shell integration") {
-		fmt.Printf("Shell integration already installed in %s\n", rcFile)
-		fmt.Println("\nUsage: n \"your query\"")
+	if err == nil && strings.Contains(string(content), "Niko") {
+		fmt.Println("Already installed!")
+		if strings.Contains(shell, "zsh") {
+			fmt.Println("\nUsage: n list files<Tab>")
+		} else {
+			fmt.Println("\nUsage: n list files")
+		}
 		return nil
 	}
 
@@ -467,15 +508,17 @@ n() {
 	}
 	defer f.Close()
 
-	if _, err := f.WriteString(shellFunc); err != nil {
+	if _, err := f.WriteString(shellCode); err != nil {
 		return err
 	}
 
-	fmt.Printf("Added shell integration to %s\n", rcFile)
-	fmt.Println("\nRun this to activate:")
-	fmt.Printf("  source %s\n", rcFile)
-	fmt.Println("\nThen use:")
-	fmt.Println("  n \"list files\"")
+	fmt.Printf("Installed to %s\n\n", rcFile)
+	fmt.Println("Restart your terminal, then:")
+	if strings.Contains(shell, "zsh") {
+		fmt.Println("  n list files<Tab>")
+	} else {
+		fmt.Println("  n list files")
+	}
 
 	return nil
 }

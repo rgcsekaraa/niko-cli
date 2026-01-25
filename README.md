@@ -86,21 +86,16 @@ $ niko "list files by size"
 ls -lhS
 ```
 
-That's it. Copy and paste, or use **shell integration** (recommended):
+### Tab Completion (Auto-Setup)
 
-### Shell Integration (Recommended)
+On first run, niko automatically sets up shell integration. Restart your terminal, then:
 
-Run once to setup:
 ```bash
-niko init
-source ~/.zshrc  # or ~/.bashrc
+$ n list files<Tab>
+$ ls -la█                # Command appears - edit or press Enter
 ```
 
-Now use `n` instead of `niko`:
-```bash
-$ n list files by size
-$ ls -lhS█   # Command appears at prompt - edit or press Enter to run
-```
+Type `n`, your query, press **Tab** - the command appears ready to run.
 
 ### Direct Execution
 

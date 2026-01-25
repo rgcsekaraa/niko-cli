@@ -11,10 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Shell Integration** - Command appears at your actual shell prompt ready to edit/run
-  - Run `niko init` to auto-setup (adds `n` function to your shell)
-  - Use `n "query"` and command appears at prompt with cursor
-  - Edit naturally with arrow keys, or press Enter to run
+- **Tab Completion** - Type `n query<Tab>` and command appears inline
+  - Auto-setup on first run (no manual steps)
+  - Works like native shell completion
+  - Edit the command or press Enter to run
 - **Direct Execution** - New `-x` flag to execute command immediately
 - **Loading Spinner** - Shows animated "Thinking..." while generating commands
 
