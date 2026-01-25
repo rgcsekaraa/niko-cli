@@ -4,7 +4,7 @@ set -e
 # Niko CLI Installer
 # Usage: curl -fsSL https://get.niko.dev | sh
 
-REPO="niko-cli/niko"
+REPO="rgcsekaraa/niko-cli"
 BINARY_NAME="niko"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 

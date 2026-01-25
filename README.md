@@ -29,12 +29,12 @@ git log --since="2 weeks ago" --stat
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/niko-cli/niko/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/scripts/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/niko-cli/niko/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/scripts/install.ps1 | iex
 ```
 
 **With Go:**

@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$REPO = "niko-cli/niko"
+$REPO = "rgcsekaraa/niko-cli"
 $BINARY_NAME = "niko"
 $INSTALL_DIR = "$env:LOCALAPPDATA\niko\bin"
 

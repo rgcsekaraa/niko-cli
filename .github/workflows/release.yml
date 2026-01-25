@@ -47,17 +47,17 @@ jobs:
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           go build -ldflags "-s -w \
-            -X github.com/milo-cli/milo/internal/cli.Version=${VERSION} \
-            -X github.com/milo-cli/milo/internal/cli.CommitSHA=${COMMIT_SHA} \
-            -X github.com/milo-cli/milo/internal/cli.BuildDate=${BUILD_DATE}" \
-            -o milo-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
-            ./cmd/milo
+            -X github.com/niko-cli/niko/internal/cli.Version=${VERSION} \
+            -X github.com/niko-cli/niko/internal/cli.CommitSHA=${COMMIT_SHA} \
+            -X github.com/niko-cli/niko/internal/cli.BuildDate=${BUILD_DATE}" \
+            -o niko-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
+            ./cmd/niko
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: milo-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: milo-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          name: niko-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: niko-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
   release:
     needs: build
