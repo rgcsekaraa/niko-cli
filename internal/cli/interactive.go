@@ -58,11 +58,11 @@ func InteractivePrompt(command string) (bool, string) {
 
 // editCommand opens readline for editing
 func editCommand(command string) string {
-	// Clear the options line
-	fmt.Print("\033[A\033[2K\033[A\033[2K\033[A\033[2K")
+	// Move cursor up and clear lines
+	fmt.Print("\033[A\033[2K\033[A\033[2K\033[A\033[2K\033[A\033[2K")
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          "",
+		Prompt:          "$ ",
 		InterruptPrompt: "^C",
 	})
 	if err != nil {
@@ -70,8 +70,8 @@ func editCommand(command string) string {
 	}
 	defer rl.Close()
 
-	// Pre-fill with command
-	rl.WriteStdin([]byte(command))
+	// Set buffer with command (pre-fill)
+	rl.Operation.SetBuffer(command)
 
 	line, err := rl.Readline()
 	if err != nil {
@@ -99,5 +99,7 @@ func ExecuteCommand(command string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Run()
+	// Run and ignore exit errors (command output already shown)
+	cmd.Run()
+	return nil
 }
