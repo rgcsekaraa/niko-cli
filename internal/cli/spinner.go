@@ -29,8 +29,6 @@ func NewSpinner(message string) *Spinner {
 
 func (s *Spinner) Start() {
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		// Not a terminal, just print the message
-		fmt.Printf("%s...\n", s.message)
 		return
 	}
 
@@ -48,11 +46,10 @@ func (s *Spinner) Start() {
 		for {
 			select {
 			case <-s.stop:
-				// Clear the spinner line
 				fmt.Print("\r\033[K")
 				return
 			default:
-				fmt.Printf("\r  %s %s", spinnerFrames[i%len(spinnerFrames)], s.message)
+				fmt.Printf("\r%s", spinnerFrames[i%len(spinnerFrames)])
 				i++
 				time.Sleep(80 * time.Millisecond)
 			}
