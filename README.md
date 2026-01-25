@@ -18,9 +18,9 @@ git log --since="2 weeks ago" --stat
 ## Features
 
 - **Free & Offline** - Runs locally, no API keys required
+- **Interactive Mode** - Run, edit, or cancel commands before execution
 - **Smart Model Selection** - Auto-selects the best model based on your RAM
 - **Safe** - Warns about dangerous commands, blocks harmful requests
-- **Fast** - Optimized for quick responses
 - **Cross-platform** - macOS, Linux, Windows
 
 ---
@@ -82,16 +82,26 @@ The selected model downloads automatically (one-time). After setup, everything r
 ## Usage
 
 ```bash
-# Basic usage
-niko "your query"
+$ niko "list files by size"
 
-# Examples
+  ⠹ Thinking...
+
+  ls -lhS
+
+  [Enter] Run  [e] Edit  [Esc/q] Cancel
+```
+
+**Interactive Controls:**
+- **Enter** - Execute the command immediately
+- **e** or **Tab** - Edit the command before running
+- **Esc** or **q** - Cancel
+
+```bash
+# More examples
 niko "find python files modified today"
 niko "show top 10 processes by memory"
 niko "compress logs folder to tar.gz"
 niko "search for TODO in all js files"
-niko "docker containers with nginx"
-niko "replace foo with bar in txt files"
 
 # Use a cloud provider for a single query
 niko -p openai "complex kubernetes deployment"
@@ -166,6 +176,16 @@ export DEEPSEEK_API_KEY=sk-xxx
 export OPENAI_API_KEY=sk-xxx
 export ANTHROPIC_API_KEY=sk-ant-xxx
 export GROK_API_KEY=xai-xxx
+```
+
+### Interactive Mode
+
+```bash
+# Disable interactive mode (just print command, don't prompt)
+niko config set ui.interactive false
+
+# Enable interactive mode (default)
+niko config set ui.interactive true
 ```
 
 ### Advanced

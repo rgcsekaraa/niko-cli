@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-01-25
+
+### Added
+
+- **Interactive Mode** - Commands now show with options to run, edit, or cancel:
+  - Press **Enter** to execute immediately
+  - Press **e** or **Tab** to edit before running
+  - Press **Esc** or **q** to cancel
+- **Loading Spinner** - Shows animated "Thinking..." while generating commands
+- Configurable via `niko config set ui.interactive true/false`
+
 ## [1.2.0] - 2025-01-25
 
 ### Added
@@ -107,10 +118,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned Features
 
-- [ ] Interactive mode for multi-turn conversations
+- [x] ~~Interactive mode~~ (added in v1.3.0)
+- [x] ~~Shell integration (execute commands directly)~~ (added in v1.3.0)
 - [ ] Command history and suggestions
 - [ ] Command explanation mode (`niko explain "complex command"`)
-- [ ] Shell integration (execute commands directly)
 - [ ] Pipe input support
 
 ### Under Consideration
