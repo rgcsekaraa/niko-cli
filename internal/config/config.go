@@ -66,8 +66,9 @@ type SafetyConfig struct {
 }
 
 type UIConfig struct {
-	Color   bool `yaml:"color" mapstructure:"color"`
-	Verbose bool `yaml:"verbose" mapstructure:"verbose"`
+	Color       bool `yaml:"color" mapstructure:"color"`
+	Verbose     bool `yaml:"verbose" mapstructure:"verbose"`
+	Interactive bool `yaml:"interactive" mapstructure:"interactive"`
 }
 
 func GetConfigDir() string {

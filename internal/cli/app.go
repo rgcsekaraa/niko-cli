@@ -164,6 +164,23 @@ func processQuery(query string) error {
 		fmt.Println()
 	}
 
+	// Interactive mode: show command and wait for user action
+	if cfg.UI.Interactive {
+		result, finalCommand := InteractivePrompt(command)
+		switch result {
+		case ResultRun:
+			return ExecuteCommand(finalCommand)
+		case ResultEdit:
+			if finalCommand != "" {
+				return ExecuteCommand(finalCommand)
+			}
+		case ResultCancel:
+			return nil
+		}
+		return nil
+	}
+
+	// Non-interactive: just print the command
 	fmt.Println(command)
 	return nil
 }
@@ -252,6 +269,9 @@ Environment variables (override config file):
 				fmt.Println(cfg.Grok.Model)
 			case "grok.temperature":
 				fmt.Println(cfg.Grok.Temperature)
+			// UI
+			case "ui.interactive":
+				fmt.Println(cfg.UI.Interactive)
 			default:
 				return fmt.Errorf("unknown key: %s\nRun 'niko config show' to see available options", key)
 			}
@@ -288,7 +308,9 @@ Available keys:
 
   grok.api_key            Grok API key
   grok.model              Grok model (grok-2-latest, etc.)
-  grok.temperature        Temperature for generation (0.0-1.0)`,
+  grok.temperature        Temperature for generation (0.0-1.0)
+
+  ui.interactive          Enable interactive mode (true|false)`,
 		Example: `  niko config set provider openai
   niko config set openai.api_key sk-xxx
   niko config set local.model llama3.2:3b

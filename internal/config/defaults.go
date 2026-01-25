@@ -53,8 +53,9 @@ func DefaultConfig() *Config {
 			},
 		},
 		UI: UIConfig{
-			Color:   true,
-			Verbose: false,
+			Color:       true,
+			Verbose:     false,
+			Interactive: true,
 		},
 	}
 }
