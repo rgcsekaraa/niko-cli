@@ -120,15 +120,23 @@ func GetFirstTool(command string) string {
 
 	firstWord := parts[0]
 
+	// Skip paths (not commands)
+	if strings.HasPrefix(firstWord, "/") || strings.HasPrefix(firstWord, "./") || strings.HasPrefix(firstWord, "../") {
+		return ""
+	}
+
+	// Skip redirects and operators
+	if isOperator(firstWord) {
+		return ""
+	}
+
 	// Skip wrapper commands only if followed by another command (not a pipe or flag)
 	skipPrefixes := []string{"sudo", "env", "nohup", "time"}
 	for _, prefix := range skipPrefixes {
 		if firstWord == prefix && len(parts) > 1 {
 			nextWord := parts[1]
 			// Don't skip if next is a pipe, redirect, or flag
-			if nextWord == "|" || nextWord == ">" || nextWord == ">>" ||
-				nextWord == "<" || nextWord == "&&" || nextWord == "||" ||
-				strings.HasPrefix(nextWord, "-") {
+			if isOperator(nextWord) || strings.HasPrefix(nextWord, "-") {
 				return firstWord
 			}
 			// Skip to next word
@@ -137,6 +145,17 @@ func GetFirstTool(command string) string {
 	}
 
 	return firstWord
+}
+
+// isOperator checks if a string is a shell operator or redirect
+func isOperator(s string) bool {
+	operators := map[string]bool{
+		"|": true, "||": true, "&&": true,
+		">": true, ">>": true, "<": true, "<<": true,
+		"2>": true, "2>>": true, "&>": true, "&>>": true,
+		"1>": true, "1>>": true,
+	}
+	return operators[s]
 }
 
 // IsToolAvailable checks if a tool is available in PATH

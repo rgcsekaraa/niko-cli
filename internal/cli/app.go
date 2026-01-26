@@ -153,6 +153,13 @@ func processQuery(query string) error {
 		return nil
 	}
 
+	// Check if the tool exists
+	tool := executor.GetFirstTool(command)
+	if tool != "" && !executor.IsToolAvailable(tool) {
+		dim := color.New(color.Faint)
+		dim.Printf("('%s' not found - install it first)\n", tool)
+	}
+
 	// Print command and copy to clipboard
 	fmt.Println(command)
 	CopyToClipboard(command)
