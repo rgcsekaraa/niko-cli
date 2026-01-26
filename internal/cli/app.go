@@ -153,13 +153,6 @@ func processQuery(query string) error {
 		return nil
 	}
 
-	// Check if the tool exists
-	tool := executor.GetFirstTool(command)
-	if tool != "" && !executor.IsToolAvailable(tool) {
-		yellow.Printf("'%s' is not installed\n", tool)
-		fmt.Println()
-	}
-
 	// Print command and copy to clipboard
 	fmt.Println(command)
 	CopyToClipboard(command)
