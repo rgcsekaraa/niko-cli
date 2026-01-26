@@ -54,14 +54,6 @@ niko "kill process on port 3000"
 niko "git commits from last week"
 ```
 
-### Cloud Providers
-
-```bash
-niko -p openai "complex kubernetes deployment"
-niko -p claude "optimize this dockerfile"
-niko -p deepseek "database migration script"
-```
-
 ## Configuration
 
 ```bash

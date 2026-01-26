@@ -43,10 +43,11 @@ Usage:
 The generated command is printed to stdout for you to review and execute.`,
 		Example: `  niko "list files modified today"
   niko "compress all jpg files in current folder"
-  niko "show processes using port 8080"
-  niko --provider openai "deploy to kubernetes"`,
+  niko "show processes using port 8080"`,
 		Args:                  cobra.MinimumNArgs(1),
 		DisableFlagsInUseLine: true,
+		SilenceUsage:          true,
+		SilenceErrors:         true,
 		RunE:                  runQuery,
 	}
 
@@ -92,7 +93,9 @@ func handleNikoQuery(query string) error {
 func processQuery(query string) error {
 	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("config error: %w", err)
+		red.Println("Failed to load config")
+		fmt.Printf("Try: niko config init\n")
+		return nil
 	}
 
 	providerName := cfg.Provider
@@ -102,12 +105,18 @@ func processQuery(query string) error {
 
 	provider, err := llm.GetProvider(providerName)
 	if err != nil {
-		return fmt.Errorf("provider error: %w", err)
+		red.Printf("Unknown provider: %s\n", providerName)
+		fmt.Println("Available: local, openai, claude, deepseek, grok")
+		return nil
 	}
 
 	if providerName != "local" && !provider.IsAvailable() {
-		return fmt.Errorf("provider '%s' not configured. Set API key:\n  niko config set %s.api_key <your-key>\n  or: export %s_API_KEY=<your-key>",
-			providerName, providerName, strings.ToUpper(providerName))
+		yellow.Printf("Provider '%s' not configured\n\n", providerName)
+		fmt.Println("Set up with:")
+		fmt.Printf("  niko config set %s.api_key <your-key>\n\n", providerName)
+		fmt.Println("Or set as environment variable:")
+		fmt.Printf("  export %s=<your-key>\n", getEnvVarName(providerName))
+		return nil
 	}
 
 	if verboseFlag {
@@ -128,7 +137,10 @@ func processQuery(query string) error {
 	spinner.Stop()
 
 	if err != nil {
-		return fmt.Errorf("generation failed: %w", err)
+		red.Println("Generation failed")
+		dim := color.New(color.Faint)
+		dim.Printf("(%v)\n", err)
+		return nil
 	}
 
 	if verboseFlag {
@@ -137,7 +149,9 @@ func processQuery(query string) error {
 
 	command := executor.ExtractCommand(response)
 	if command == "" {
-		return fmt.Errorf("could not generate a valid command")
+		yellow.Println("Could not generate a command")
+		fmt.Println("Try being more specific")
+		return nil
 	}
 
 	// Handle declined/special messages from the LLM
@@ -380,5 +394,20 @@ func localStatus(cfg *config.Config) string {
 		return "ready"
 	}
 	return "running (" + cfg.Local.Model + ")"
+}
+
+func getEnvVarName(provider string) string {
+	switch provider {
+	case "claude":
+		return "ANTHROPIC_API_KEY"
+	case "openai":
+		return "OPENAI_API_KEY"
+	case "deepseek":
+		return "DEEPSEEK_API_KEY"
+	case "grok":
+		return "GROK_API_KEY"
+	default:
+		return strings.ToUpper(provider) + "_API_KEY"
+	}
 }
 
