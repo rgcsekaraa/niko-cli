@@ -125,7 +125,7 @@ func (m *OllamaManager) downloadOllama(progressFn func(status string, pct float6
 			return err
 		}
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	if progressFn != nil {
 		progressFn("Extracting Ollama...", 100)

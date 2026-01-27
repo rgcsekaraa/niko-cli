@@ -32,7 +32,7 @@ func CopyToClipboard(text string) error {
 	if _, err := pipe.Write([]byte(text)); err != nil {
 		return err
 	}
-	pipe.Close()
+	_ = pipe.Close()
 
 	return cmd.Wait()
 }
