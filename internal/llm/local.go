@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rgcsekaraa/niko-cli/internal/config"
 	"github.com/pbnjay/memory"
+	"github.com/rgcsekaraa/niko-cli/internal/config"
 )
 
 const (
@@ -87,7 +87,7 @@ func (p *LocalProvider) IsAvailable() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode == http.StatusOK
 }
 
@@ -133,7 +133,7 @@ func (p *LocalProvider) Generate(ctx context.Context, systemPrompt, userPrompt s
 	if err != nil {
 		return "", fmt.Errorf("failed to call ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -254,7 +254,7 @@ func (p *LocalProvider) EnsureModelExists(ctx context.Context) error {
 	// Save the selection to config
 	if err := config.Set("local.model", selectedModel); err != nil {
 		// Non-fatal, continue anyway
-		fmt.Fprintf(os.Stderr, "Warning: could not save model preference: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Warning: could not save model preference: %v\n", err)
 	}
 
 	fmt.Println()
@@ -341,7 +341,7 @@ func (p *LocalProvider) hasModel(ctx context.Context, model string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Models []struct {
@@ -382,7 +382,7 @@ func (p *LocalProvider) pullModel(ctx context.Context, model string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	scanner := bufio.NewScanner(resp.Body)
 	var lastStatus string
@@ -423,7 +423,7 @@ func IsOllamaRunning() bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode == http.StatusOK
 }
 

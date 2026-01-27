@@ -90,7 +90,7 @@ func (m *OllamaManager) downloadOllama(progressFn func(status string, pct float6
 	if err != nil {
 		return fmt.Errorf("failed to download Ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download Ollama: HTTP %d", resp.StatusCode)
@@ -100,7 +100,7 @@ func (m *OllamaManager) downloadOllama(progressFn func(status string, pct float6
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	total := resp.ContentLength
 	var downloaded int64
@@ -179,13 +179,13 @@ func (m *OllamaManager) copyBinary(src string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	dstFile, err := os.Create(m.binPath)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	_, err = io.Copy(dstFile, srcFile)
 	return err
@@ -196,19 +196,19 @@ func (m *OllamaManager) extractTarGz(archivePath string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return err
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	tmpDir, err := os.MkdirTemp("", "ollama-extract-*")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	cmd := exec.Command("tar", "-xf", "-", "-C", tmpDir)
 	cmd.Stdin = gzr
@@ -229,7 +229,7 @@ func (m *OllamaManager) extractZip(archivePath string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
 		if strings.HasSuffix(f.Name, "ollama.exe") {
@@ -237,13 +237,13 @@ func (m *OllamaManager) extractZip(archivePath string) error {
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 
 			outFile, err := os.Create(m.binPath)
 			if err != nil {
 				return err
 			}
-			defer outFile.Close()
+			defer func() { _ = outFile.Close() }()
 
 			_, err = io.Copy(outFile, rc)
 			return err

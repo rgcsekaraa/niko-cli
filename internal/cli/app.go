@@ -120,7 +120,7 @@ func processQuery(query string) error {
 	}
 
 	if verboseFlag {
-		fmt.Fprintf(os.Stderr, "[debug] provider: %s\n", provider.Name())
+		_, _ = fmt.Fprintf(os.Stderr, "[debug] provider: %s\n", provider.Name())
 	}
 
 	ctx := context.Background()
@@ -144,7 +144,7 @@ func processQuery(query string) error {
 	}
 
 	if verboseFlag {
-		fmt.Fprintf(os.Stderr, "[debug] response time: %v\n", time.Since(start))
+		_, _ = fmt.Fprintf(os.Stderr, "[debug] response time: %v\n", time.Since(start))
 	}
 
 	command := executor.ExtractCommand(response)
