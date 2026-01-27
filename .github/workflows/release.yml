@@ -35,7 +35,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Build
         env:
@@ -47,9 +47,9 @@ jobs:
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           go build -ldflags "-s -w \
-            -X github.com/niko-cli/niko/internal/cli.Version=${VERSION} \
-            -X github.com/niko-cli/niko/internal/cli.CommitSHA=${COMMIT_SHA} \
-            -X github.com/niko-cli/niko/internal/cli.BuildDate=${BUILD_DATE}" \
+            -X github.com/rgcsekaraa/niko-cli/internal/cli.Version=${VERSION} \
+            -X github.com/rgcsekaraa/niko-cli/internal/cli.CommitSHA=${COMMIT_SHA} \
+            -X github.com/rgcsekaraa/niko-cli/internal/cli.BuildDate=${BUILD_DATE}" \
             -o niko-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
             ./cmd/niko
 
