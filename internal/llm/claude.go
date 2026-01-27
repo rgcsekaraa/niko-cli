@@ -6,7 +6,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/niko-cli/niko/internal/config"
+	"github.com/rgcsekaraa/niko-cli/internal/config"
 )
 
 type ClaudeProvider struct {

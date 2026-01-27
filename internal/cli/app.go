@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/niko-cli/niko/internal/config"
-	"github.com/niko-cli/niko/internal/executor"
-	"github.com/niko-cli/niko/internal/llm"
-	"github.com/niko-cli/niko/internal/prompt"
+	"github.com/rgcsekaraa/niko-cli/internal/config"
+	"github.com/rgcsekaraa/niko-cli/internal/executor"
+	"github.com/rgcsekaraa/niko-cli/internal/llm"
+	"github.com/rgcsekaraa/niko-cli/internal/prompt"
 	"github.com/spf13/cobra"
 )
 

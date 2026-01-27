@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/niko-cli/niko/internal/cli"
+	"github.com/rgcsekaraa/niko-cli/internal/cli"
 )
 
 func main() {

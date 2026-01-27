@@ -4,9 +4,9 @@ COMMIT_SHA?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 LDFLAGS=-ldflags "-s -w \
-	-X github.com/niko-cli/niko/internal/cli.Version=$(VERSION) \
-	-X github.com/niko-cli/niko/internal/cli.CommitSHA=$(COMMIT_SHA) \
-	-X github.com/niko-cli/niko/internal/cli.BuildDate=$(BUILD_DATE)"
+	-X github.com/rgcsekaraa/niko-cli/internal/cli.Version=$(VERSION) \
+	-X github.com/rgcsekaraa/niko-cli/internal/cli.CommitSHA=$(COMMIT_SHA) \
+	-X github.com/rgcsekaraa/niko-cli/internal/cli.BuildDate=$(BUILD_DATE)"
 
 DIST_DIR=dist
 

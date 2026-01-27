@@ -30,7 +30,7 @@ iwr -useb https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/scripts/ins
 
 **With Go:**
 ```bash
-go install github.com/niko-cli/niko/cmd/niko@latest
+go install github.com/rgcsekaraa/niko-cli/cmd/niko@latest
 ```
 
 ## Usage

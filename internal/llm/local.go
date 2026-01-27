@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/niko-cli/niko/internal/config"
+	"github.com/rgcsekaraa/niko-cli/internal/config"
 	"github.com/pbnjay/memory"
 )
 
