@@ -154,7 +154,7 @@ func Save(c *Config) error {
 
 func Get() *Config {
 	if cfg == nil {
-		Load()
+		_, _ = Load()
 	}
 	return cfg
 }

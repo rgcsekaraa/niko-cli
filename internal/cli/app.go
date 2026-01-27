@@ -176,7 +176,7 @@ func processQuery(query string) error {
 
 	// Print command and copy to clipboard
 	fmt.Println(command)
-	CopyToClipboard(command)
+	_ = CopyToClipboard(command)
 
 	// Show subtle warning if dangerous
 	risk := executor.AssessRisk(command)
