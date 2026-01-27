@@ -29,7 +29,9 @@ func CopyToClipboard(text string) error {
 		return err
 	}
 
-	pipe.Write([]byte(text))
+	if _, err := pipe.Write([]byte(text)); err != nil {
+		return err
+	}
 	pipe.Close()
 
 	return cmd.Wait()

@@ -109,7 +109,9 @@ func (m *OllamaManager) downloadOllama(progressFn func(status string, pct float6
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
-			tmpFile.Write(buf[:n])
+			if _, err := tmpFile.Write(buf[:n]); err != nil {
+				return err
+			}
 			downloaded += int64(n)
 			if progressFn != nil && total > 0 {
 				pct := float64(downloaded) / float64(total) * 100
@@ -282,7 +284,7 @@ func (m *OllamaManager) StartServer() (*exec.Cmd, error) {
 		}
 	}
 
-	cmd.Process.Kill()
+	_ = cmd.Process.Kill()
 	return nil, fmt.Errorf("ollama server failed to start")
 }
 
