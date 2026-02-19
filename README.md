@@ -1,5 +1,8 @@
 # Niko
 
+[![Latest Release](https://img.shields.io/github/v/release/rgcsekaraa/niko-cli?style=flat-square)](https://github.com/rgcsekaraa/niko-cli/releases)
+[![License](https://img.shields.io/github/license/rgcsekaraa/niko-cli?style=flat-square)](LICENSE)
+
 **AI-powered CLI: explain code, generate shell commands, use any LLM provider.**
 
 Built in Rust. Works on macOS, Linux, and Windows.
@@ -50,6 +53,10 @@ iwr -useb https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/install.ps1
 ### From Source (Rust required)
 
 ```bash
+# Install latest version from git
+cargo install --git https://github.com/rgcsekaraa/niko-cli
+
+# Or install from local source
 cargo install --path .
 ```
 
