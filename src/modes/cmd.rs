@@ -3,13 +3,15 @@ use colored::*;
 
 use crate::{llm, prompt, safety, ui};
 
+/// Max tokens for command generation — commands are short, 512 is plenty
+const CMD_MAX_TOKENS: u32 = 512;
+
 /// Run the /cmd mode — translate natural language to shell commands
 pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Result<()> {
     if query.trim().is_empty() {
         bail!("Please provide a query.\nUsage: niko cmd \"find all large files\"");
     }
 
-    // Get provider
     let provider = llm::get_provider(provider_override)?;
 
     if !provider.is_available() {
@@ -19,23 +21,18 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
     }
 
     if verbose {
-        eprintln!(
-            "{} provider: {}",
-            "debug".dimmed(),
-            provider.name().dimmed()
-        );
+        eprintln!("{} provider: {}", "debug".dimmed(), provider.name().dimmed());
     }
 
-    // Gather system context and build prompts
     let ctx = prompt::gather_context();
     let system_prompt = prompt::cmd_system_prompt(&ctx);
 
-    // Show spinner while generating
     let mut spinner = ui::Spinner::new("Thinking...");
     spinner.start();
 
     let start = std::time::Instant::now();
-    let response = llm::generate_with_retry(provider.as_ref(), &system_prompt, query);
+    // Non-streaming with retry — we need the full command for safety checks
+    let response = llm::generate_with_retry(provider.as_ref(), &system_prompt, query, CMD_MAX_TOKENS);
     spinner.stop();
 
     let elapsed = start.elapsed();
@@ -60,7 +57,6 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
         return Ok(());
     }
 
-    // Handle declined/special messages
     if command.starts_with("Declined:")
         || command.starts_with("Please specify:")
         || command.starts_with("echo \"Declined:")
@@ -74,22 +70,18 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
         return Ok(());
     }
 
-    // Check if the tool exists
     if let Some(tool) = safety::get_first_tool(&command) {
         if !safety::is_tool_available(&tool) {
             ui::print_dim(&format!("  '{}' not found — install it first", tool));
         }
     }
 
-    // Display command in a bordered box
     ui::display_command(&command);
 
-    // Copy to clipboard
     if ui::copy_to_clipboard(&command) {
         ui::print_dim("  Copied to clipboard ✓");
     }
 
-    // Safety warning
     let risk = safety::assess_risk(&command);
     match risk {
         safety::RiskLevel::Critical => {

@@ -5,9 +5,8 @@ use colored::*;
 
 use crate::{chunker, llm, ui};
 
-/// Run the /explain mode — explain code with chunking for large inputs
+/// Run the /explain mode — explain code with streaming and chunking
 pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bool) -> Result<()> {
-    // Read the code input
     let code = if let Some(path) = file_path {
         let content = fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("Failed to read file '{}': {}", path, e))?;
@@ -15,10 +14,7 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         let line_count = content.lines().count();
         eprintln!();
         ui::box_top(&format!("{}", format!("File: {}", path).dimmed()));
-        ui::box_line(&format!(
-            "{}",
-            format!("{} lines loaded", line_count).cyan()
-        ));
+        ui::box_line(&format!("{}", format!("{} lines loaded", line_count).cyan()));
         ui::box_bottom();
 
         content
@@ -39,7 +35,6 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         );
     }
 
-    // Show collapsible code preview for interactive input
     if file_path.is_none() {
         ui::show_code_preview(&code);
     }
@@ -47,12 +42,11 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
     let line_count = code.lines().count();
     eprintln!();
     eprintln!(
-        "  {} Analyzing {} lines...",
+        "  {} Analyzing {} lines…",
         "📖".to_string(),
         line_count.to_string().cyan()
     );
 
-    // Get provider
     let provider = llm::get_provider(provider_override)?;
 
     if !provider.is_available() {
@@ -65,16 +59,14 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         ui::print_dim(&format!("  provider: {}", provider.name()));
     }
 
-    // Process with chunking engine (includes retry + context memory)
-    let mut spinner = ui::Spinner::new("Analyzing code...");
-    spinner.start();
+    // Stream = true for chunk analysis (tokens appear immediately)
+    // The spinner is only needed for non-streaming mode
+    let stream = true;
 
-    let result = chunker::explain_code(&code, provider.as_ref(), verbose);
-    spinner.stop();
+    let result = chunker::explain_code(&code, provider.as_ref(), verbose, stream);
 
     match result {
         Ok(explanation) => {
-            // Show timing
             ui::print_dim(&format!("  Completed in {:.1}s", explanation.elapsed.as_secs_f64()));
             ui::display_explanation(&explanation);
         }
