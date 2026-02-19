@@ -136,19 +136,23 @@ niko explain -f main.rs --provider claude
 
 ---
 
-## Reliability
+## Reliability & Performance
 
-Niko is designed for production use with several reliability features:
+Niko is designed for production use with reliability and speed:
 
 | Feature | Details |
 |---------|---------|
-| **Retry** | 3 attempts with exponential backoff (500ms, 1s, 2s + jitter) |
+| **Streaming** | Tokens appear immediately as the LLM generates them (all providers) |
+| **Retry** | 3 attempts with exponential backoff (500ms → 2s + jitter) |
 | **Retryable errors** | Timeouts, connection resets, 429/5xx, rate limits, model loading |
-| **Connection pooling** | HTTP keep-alive with 4 idle connections per host, 90s timeout |
-| **Empty response guard** | Detects and retries empty/null responses from LLMs |
-| **Truncation detection** | Warns when response hits max_tokens (Claude stop_reason, OpenAI finish_reason) |
+| **Connection pooling** | HTTP keep-alive, 4 idle connections/host, TCP keepalive 30s |
+| **Model keep-alive** | Ollama keeps model in VRAM for 30 min (no reload between calls) |
+| **Flash attention** | Enabled by default for Ollama (faster on Apple Silicon / GPU) |
+| **Adaptive tokens** | `cmd` mode uses 512 max tokens, `explain` uses 4096 — less KV cache for short tasks |
 | **Adaptive context** | Ollama context window scales with prompt size (4K → 16K) |
-| **Context memory** | Multi-chunk explanations carry 10-line overlap + running summaries |
+| **Empty response guard** | Detects and retries empty/null LLM responses |
+| **Truncation detection** | Warns when response hits max_tokens (Claude, OpenAI) |
+| **Context memory** | Multi-chunk explanations carry 10-line code overlap for boundary continuity |
 | **Structured errors** | Parses API error responses for clear, actionable messages |
 
 ---
