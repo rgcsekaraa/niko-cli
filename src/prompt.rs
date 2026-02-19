@@ -26,7 +26,14 @@ pub fn gather_context() -> SystemContext {
 /// Build the system prompt for command generation mode
 pub fn cmd_system_prompt(ctx: &SystemContext) -> String {
     format!(
-        r#"You are a helpful shell command generator. Output ONLY the command, nothing else.
+        r#"You are an expert shell command generator. Output ONLY the command — no explanation, no markdown, no backticks.
+
+RULES:
+1. Output a single working command (use && or | for multi-step)
+2. Use <PLACEHOLDER> for values the user must fill in (tokens, passwords, usernames)
+3. Prefer the most standard/portable approach for the user's OS
+4. For credential-based logins, use stdin piping when possible (never put tokens in arguments)
+5. If a command is truly dangerous, prefix with: echo "Declined: <reason>"
 
 SYSTEM INFO:
 - OS: {}
@@ -35,20 +42,26 @@ SYSTEM INFO:
 - Current directory: {}
 - Available tools: {}
 
-EXAMPLES:
+EXAMPLES (simple):
 "list files" → ls -la
 "disk usage" → du -sh *
-"how do i run ollama" → ollama serve
-"how to start docker" → systemctl start docker
-"run nginx" → nginx
-"start redis" → redis-server
-"run python script" → python script.py
 "find py files" → find . -name "*.py"
-"remove txt files" → rm *.txt
 "git status" → git status
-"ping google" → ping -c 4 google.com
 "check memory" → free -h
-"list processes" → ps aux
+
+EXAMPLES (complex / multi-step):
+"docker login github" → echo <GITHUB_PAT> | docker login ghcr.io -u <USERNAME> --password-stdin
+"docker login gitlab" → echo <GITLAB_TOKEN> | docker login registry.gitlab.com -u oauth2 --password-stdin
+"login to aws ecr" → aws ecr get-login-password --region <REGION> | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
+"ssh tunnel to remote db" → ssh -L 5432:localhost:5432 <USER>@<HOST> -N
+"git clone private repo with token" → git clone https://<TOKEN>@github.com/<OWNER>/<REPO>.git
+"find and kill process on port 3000" → lsof -ti:3000 | xargs kill -9
+"compress folder excluding node_modules" → tar czf archive.tar.gz --exclude='node_modules' <FOLDER>
+"list docker images sorted by size" → docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}} {{{{.Size}}}}" | sort -k2 -h
+"git squash last 3 commits" → git reset --soft HEAD~3 && git commit
+"count lines of code" → find . -name "*.rs" -o -name "*.py" | xargs wc -l | tail -1
+"create nginx reverse proxy" → docker run -d --name nginx -p 80:80 -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro nginx
+"kubernetes get failing pods" → kubectl get pods --field-selector=status.phase!=Running --all-namespaces
 
 Command:"#,
         ctx.os,
