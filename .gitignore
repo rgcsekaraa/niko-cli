@@ -1,46 +1,9 @@
-# Binaries (root level only)
-/niko
-/niko.exe
-*.dll
-*.dll
-*.so
-*.dylib
-
-# Build output
-dist/
-build/
-bin/
-
-# Test binary
-*.test
-
-# Go workspace
-go.work
-go.work.sum
-
-# IDE
-.idea/
-.vscode/
+/target
+/dist
 *.swp
 *.swo
 *~
-
-# OS files
 .DS_Store
-.DS_Store?
 Thumbs.db
-ehthumbs.db
-
-# Debug
-debug
 *.log
-
-# Coverage
-coverage.out
-coverage.html
-
-# Local config (users should not commit their API keys)
-# config.yaml is in ~/.niko/, not in repo
-
-# Claude Code
-.claude/
+niko
