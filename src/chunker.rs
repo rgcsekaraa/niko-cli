@@ -25,7 +25,7 @@ pub struct CodeChunk {
 }
 
 /// Result of explaining a single chunk
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChunkExplanation {
     pub start_line: usize,
     pub end_line: usize,
@@ -33,7 +33,7 @@ pub struct ChunkExplanation {
 }
 
 /// Full explanation result
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExplainResult {
     pub total_lines: usize,
     pub total_chunks: usize,
@@ -149,15 +149,17 @@ fn is_definition_start(line: &str) -> bool {
 
 /// Process all chunks through the LLM with streaming and retry.
 ///
-/// When `stream` is true, tokens are printed to stderr as they arrive
-/// (faster perceived response time). The synthesis step always uses
-/// non-streaming with retry since we need the full response.
-pub fn explain_code(
+/// If `stream_callback` is provided, tokens are passed to it as they arrive.
+/// The synthesis step always uses non-streaming with retry since we need the full response.
+pub fn explain_code<F>(
     code: &str,
     provider: &dyn Provider,
     verbose: bool,
-    stream: bool,
-) -> Result<ExplainResult> {
+    mut stream_callback: Option<F>,
+) -> Result<ExplainResult>
+where
+    F: FnMut(&str),
+{
     let start_time = Instant::now();
     let chunks = chunk_code(code);
     let total_lines = code.lines().count();
@@ -166,7 +168,11 @@ pub fn explain_code(
     if verbose {
         eprintln!(
             "  [debug] {} lines → {} chunks (max {} lines/chunk, {} line overlap, stream={})",
-            total_lines, total_chunks, MAX_CHUNK_LINES, CONTEXT_OVERLAP_LINES, stream
+            total_lines,
+            total_chunks,
+            MAX_CHUNK_LINES,
+            CONTEXT_OVERLAP_LINES,
+            stream_callback.is_some()
         );
     }
 
@@ -174,13 +180,17 @@ pub fn explain_code(
 
     for (i, chunk) in chunks.iter().enumerate() {
         if total_chunks > 1 {
-            eprintln!(
-                "  Chunk {}/{} (lines {}–{})…",
-                i + 1,
-                total_chunks,
-                chunk.start_line,
-                chunk.end_line
-            );
+            // TODO: If we have a callback, maybe we should report progress too?
+            // For now, assume the caller handles progress indication or we print it if verbose.
+            if verbose {
+                eprintln!(
+                    "  [debug] Chunk {}/{} (lines {}–{})…",
+                    i + 1,
+                    total_chunks,
+                    chunk.start_line,
+                    chunk.end_line
+                );
+            }
         }
 
         let system_prompt = build_chunk_system_prompt(i + 1, total_chunks);
@@ -204,20 +214,15 @@ pub fn explain_code(
             )
         };
 
-        let explanation = if stream {
-            // Stream tokens to stderr for immediate feedback
-            eprintln!();
-            let result = llm::generate_streaming(
+        let explanation = if let Some(ref mut callback) = stream_callback {
+            // Stream tokens to callback
+            llm::generate_streaming(
                 provider,
                 &system_prompt,
                 &user_prompt,
                 CHUNK_MAX_TOKENS,
-                &mut |token| {
-                    eprint!("{}", token);
-                },
-            );
-            eprintln!("\n");
-            result?
+                callback,
+            )?
         } else {
             llm::generate_with_retry(provider, &system_prompt, &user_prompt, CHUNK_MAX_TOKENS)?
         };
@@ -230,10 +235,8 @@ pub fn explain_code(
     }
 
     // Synthesis — always non-streaming with retry (needs full response for parsing)
+    // We could stream status updates if we had a status callback, but for now we just run it.
     let (summary, questions) = if total_chunks > 1 {
-        if stream {
-            eprintln!("  Synthesizing…");
-        }
         generate_summary_and_questions(provider, &chunk_explanations, total_lines)?
     } else {
         let explanation = &chunk_explanations[0].explanation;

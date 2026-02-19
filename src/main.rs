@@ -6,6 +6,8 @@ mod prompt;
 mod safety;
 mod ui;
 
+mod tui;
+
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
@@ -142,10 +144,12 @@ fn main() {
                 let query_str = cli.query.join(" ");
                 modes::cmd::run(&query_str, cli.provider.as_deref(), cli.verbose)
             } else {
-                // No args — show help
-                use clap::CommandFactory;
-                Cli::command().print_help().ok();
-                println!();
+                // No args — launch TUI
+                if let Err(e) = tui::run() {
+                    // If TUI fails (e.g. not a tty), fall back to help?
+                    // Or just print error.
+                    eprintln!("Error launching TUI: {}", e);
+                }
                 Ok(())
             }
         }

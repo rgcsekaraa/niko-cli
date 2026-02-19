@@ -61,7 +61,18 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
     // The spinner is only needed for non-streaming mode
     let stream = true;
 
-    let result = chunker::explain_code(&code, provider.as_ref(), verbose, stream);
+    let result = if stream {
+        chunker::explain_code(
+            &code,
+            provider.as_ref(),
+            verbose,
+            Some(|token: &str| {
+                eprint!("{}", token);
+            }),
+        )
+    } else {
+        chunker::explain_code::<fn(&str)>(&code, provider.as_ref(), verbose, None)
+    };
 
     match result {
         Ok(explanation) => {
