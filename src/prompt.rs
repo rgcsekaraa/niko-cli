@@ -516,7 +516,12 @@ fn truncate_help(text: &str) -> String {
     if text.len() <= MAX_HELP_CHARS {
         return text.to_string();
     }
-    let truncated = &text[..MAX_HELP_CHARS];
+    // Find a safe char boundary at or before MAX_HELP_CHARS
+    let mut end = MAX_HELP_CHARS;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    let truncated = &text[..end];
     if let Some(last_nl) = truncated.rfind('\n') {
         format!("{}\n[...truncated]", &truncated[..last_nl])
     } else {

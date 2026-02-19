@@ -183,7 +183,12 @@ fn retry_delay(attempt: u32) -> Duration {
 fn summarize_error(err: &anyhow::Error) -> String {
     let full = format!("{:#}", err);
     if full.len() > 80 {
-        format!("{}…", &full[..77])
+        // Find a safe char boundary at or before 77
+        let mut end = 77;
+        while end > 0 && !full.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}…", &full[..end])
     } else {
         full
     }

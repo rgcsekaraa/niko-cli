@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use colored::*;
+use unicode_truncate::UnicodeTruncateStr;
 
 // ─── Box-drawing constants (Claude Code-inspired) ───────────────────────────
 
@@ -305,7 +306,8 @@ pub fn show_code_preview(code: &str) -> bool {
         box_top(&format!("{}", format!("Code ({} lines)", count).dimmed()));
         for line in &lines {
             let truncated = if line.len() > BOX_WIDTH - 3 {
-                format!("{}…", &line[..BOX_WIDTH - 4])
+                let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
+                format!("{}…", cut)
             } else {
                 line.to_string()
             };
@@ -321,7 +323,8 @@ pub fn show_code_preview(code: &str) -> bool {
     // First 5 lines
     for line in lines.iter().take(5) {
         let truncated = if line.len() > BOX_WIDTH - 3 {
-            format!("{}…", &line[..BOX_WIDTH - 4])
+            let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
+            format!("{}…", cut)
         } else {
             line.to_string()
         };
@@ -339,7 +342,8 @@ pub fn show_code_preview(code: &str) -> bool {
     // Last 3 lines
     for line in lines.iter().skip(count - 3) {
         let truncated = if line.len() > BOX_WIDTH - 3 {
-            format!("{}…", &line[..BOX_WIDTH - 4])
+            let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
+            format!("{}…", cut)
         } else {
             line.to_string()
         };
@@ -365,8 +369,10 @@ pub fn show_code_preview(code: &str) -> bool {
         ));
         for (i, line) in lines.iter().enumerate() {
             let line_num = format!("{:>4}", i + 1).dimmed();
+
             let truncated = if line.len() > BOX_WIDTH - 8 {
-                format!("{}…", &line[..BOX_WIDTH - 9])
+                let (cut, _) = line.unicode_truncate(BOX_WIDTH - 9);
+                format!("{}…", cut)
             } else {
                 line.to_string()
             };
@@ -426,7 +432,8 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
             box_empty();
             for line in chunk.explanation.lines() {
                 let display = if line.len() > BOX_WIDTH - 4 {
-                    format!("{}…", &line[..BOX_WIDTH - 5])
+                    let (cut, _) = line.unicode_truncate(BOX_WIDTH - 5);
+                    format!("{}…", cut)
                 } else {
                     line.to_string()
                 };
