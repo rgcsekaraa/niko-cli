@@ -211,28 +211,71 @@ pub fn explain_code(
 
 fn build_chunk_system_prompt(chunk_num: usize, total_chunks: usize) -> String {
     if total_chunks == 1 {
-        return r#"You are an expert code analyst. Analyze the given code and provide:
+        return r#"You are a senior software engineer conducting a thorough code review. Analyze the code and produce a structured explanation in markdown.
 
-1. **Overview**: What the code does at a high level
-2. **Functions & Components**: Explain each function/method, its purpose, parameters, and return values
-3. **Key Logic**: Highlight important algorithms, patterns, or design decisions
-4. **Dependencies**: Note any imports, external libraries, or dependencies used
+## Overview
+One paragraph: what does this code do, what problem does it solve, and what is its role in a larger system.
 
-Be thorough but concise. Use markdown formatting."#.to_string();
+## Architecture & Design Patterns
+- Identify design patterns (builder, factory, observer, strategy, etc.)
+- Note architectural decisions (layering, separation of concerns, dependency injection)
+- Call out any anti-patterns or code smells
+
+## Detailed Walkthrough
+For EVERY function, method, struct, enum, trait, and significant constant:
+
+### `function_name(params) -> ReturnType`
+- **Purpose**: What it does and why
+- **Parameters**: Each param with its type and role
+- **Returns**: What the return value represents
+- **Key logic**: Algorithm, branching, error handling
+- **Edge cases**: Boundary conditions, nil/empty checks, overflow risks
+
+## Error Handling
+- How errors are created, propagated, and recovered from
+- Missing error handling that should exist
+
+## Dependencies & Imports
+- External crates/packages and what they provide
+- Standard library usage patterns
+
+## Potential Issues
+- Performance concerns (N+1 queries, unnecessary allocations, blocking calls)
+- Security considerations (input validation, injection risks, secret handling)
+- Concurrency issues (race conditions, deadlocks, shared mutable state)
+- Missing edge cases or insufficient validation
+
+Be thorough — do NOT skip any function or type definition. Use code-aware language (refer to actual names from the code)."#.to_string();
     }
 
     format!(
-        r#"You are an expert code analyst. You are analyzing chunk {chunk_num} of {total_chunks} of a larger codebase.
+        r#"You are a senior software engineer analyzing chunk {chunk_num} of {total_chunks} of a larger codebase.
 
-Some preceding lines may be included for boundary context — focus your analysis on the code after the "[chunk starts here]" marker.
+Some preceding lines may be included for boundary context — focus your analysis on the code after the "[chunk starts here]" marker. Do NOT re-explain the context lines.
 
-Analyze this code segment and provide:
+For this chunk, provide:
 
-1. **Summary**: What this chunk does
-2. **Functions & Components**: Explain each function/method — purpose, parameters, return values
-3. **Key Details**: Important patterns, edge cases, cross-references
+## Summary
+What this chunk does, what components it defines, and how it likely connects to the rest of the codebase.
 
-Be thorough — capture every function, struct, and important constant. Use markdown formatting."#
+## Detailed Walkthrough
+For EVERY function, method, struct, enum, trait, and constant in this chunk:
+
+### `name(params) -> ReturnType`
+- **Purpose**: What and why
+- **Parameters**: Each param, type, role
+- **Returns**: What the value represents
+- **Key logic**: Core algorithm, branching, errors
+- **Edge cases**: Boundary conditions, potential failures
+
+## Cross-References
+- Functions or types called/used that are likely defined in other chunks
+- Dependencies on external types or traits
+
+## Potential Issues
+- Performance, security, or correctness concerns specific to this chunk
+
+Be thorough — capture EVERY definition. Do not omit anything. Use actual names from the code."#
     )
 }
 
@@ -246,21 +289,29 @@ fn generate_summary_and_questions(
         .collect::<Vec<_>>()
         .join("\n\n---\n\n");
 
-    let system_prompt = r#"You are an expert code analyst. Synthesize the chunk analyses into:
+    let system_prompt = r#"You are a senior software architect synthesizing a multi-chunk code analysis. You have been given individual analyses of each chunk — now produce a unified view.
 
-1. **Overall Summary** (2-3 paragraphs): Architecture, purpose, and key design decisions
-2. **Follow-up Questions**: Exactly 5 insightful questions
+Your response MUST use this exact format:
 
-Format:
 ## Summary
-[summary]
+2-3 paragraphs covering:
+- What the entire codebase does (purpose, domain, user-facing behavior)
+- Architecture: how the chunks connect (data flow, call chains, dependency graph)
+- Key design decisions: patterns used, tradeoffs made, and why they matter
+- Quality assessment: code health, consistency, and notable strengths or weaknesses
+
+## Key Components
+Bullet list of the most important types/functions and their roles across the codebase.
 
 ## Follow-up Questions
-1. [question]
-2. [question]
-3. [question]
-4. [question]
-5. [question]"#;
+5 targeted questions, one from each category:
+1. [Architecture] — about structure, modularity, or coupling
+2. [Testing] — about test coverage, edge cases, or testability
+3. [Security] — about input validation, secrets, or access control
+4. [Performance] — about bottlenecks, scaling, or resource usage
+5. [Maintainability] — about readability, tech debt, or extensibility
+
+Do NOT just summarize each chunk sequentially — synthesize across chunks to show the bigger picture."#;
 
     let user_prompt = format!(
         "The codebase has {} total lines across {} chunks:\n\n{}",
@@ -273,12 +324,15 @@ Format:
 }
 
 fn generate_follow_up_only(provider: &dyn Provider, explanation: &str) -> Result<Vec<String>> {
-    let system_prompt = r#"Generate exactly 5 insightful follow-up questions about this code. Format:
-1. [question]
-2. [question]
-3. [question]
-4. [question]
-5. [question]"#;
+    let system_prompt = r#"Based on the code analysis below, generate exactly 5 follow-up questions that would help someone deeply understand and improve this code. One question from each category:
+
+1. [Architecture] — How the code is structured, modularity, coupling, or design patterns
+2. [Testing] — Test coverage gaps, edge cases to test, or testability improvements
+3. [Security] — Input validation, secret handling, injection risks, or access control
+4. [Performance] — Potential bottlenecks, unnecessary allocations, or scaling concerns
+5. [Maintainability] — Readability, tech debt, documentation, or future extensibility
+
+Make each question specific to the actual code (reference real function/type names). Do NOT ask generic questions."#;
 
     let response = llm::generate_with_retry(provider, system_prompt, explanation, FOLLOWUP_MAX_TOKENS)?;
 
