@@ -10,54 +10,59 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
-          - goos: windows
-            goarch: amd64
-            ext: .exe
-          - goos: windows
-            goarch: arm64
-            ext: .exe
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: niko
+            asset_name: niko-linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: niko
+            asset_name: niko-linux-arm64
+            use_cross: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: niko
+            asset_name: niko-darwin-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: niko
+            asset_name: niko-darwin-arm64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: niko.exe
+            asset_name: niko-windows-amd64.exe
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: '1.24'
+          targets: ${{ matrix.target }}
 
       - name: Build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          COMMIT_SHA=${GITHUB_SHA::7}
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: ${{ matrix.use_cross }}
+          command: build
+          args: --release --target ${{ matrix.target }}
 
-          go build -ldflags "-s -w \
-            -X github.com/rgcsekaraa/niko-cli/internal/cli.Version=${VERSION} \
-            -X github.com/rgcsekaraa/niko-cli/internal/cli.CommitSHA=${COMMIT_SHA} \
-            -X github.com/rgcsekaraa/niko-cli/internal/cli.BuildDate=${BUILD_DATE}" \
-            -o niko-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} \
-            ./cmd/niko
+      - name: Rename and Asset Preparation
+        shell: bash
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: niko-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: niko-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
 
   release:
     needs: build
@@ -66,17 +71,11 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: artifacts
           merge-multiple: true
-
-      - name: Create checksums
-        run: |
-          cd dist
-          sha256sum * > checksums.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            dist/*
+          files: artifacts/*
           generate_release_notes: true

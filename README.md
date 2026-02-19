@@ -38,21 +38,19 @@ $ cat main.rs | niko explain
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/install.sh | sh
 ```
 
-### With Cargo
+### Windows (PowerShell)
 
-```bash
-cargo install --git https://github.com/rgcsekaraa/niko-cli
+```powershell
+iwr -useb https://raw.githubusercontent.com/rgcsekaraa/niko-cli/main/install.ps1 | iex
 ```
 
-### From Source
+### From Source (Rust required)
 
 ```bash
-git clone https://github.com/rgcsekaraa/niko-cli.git
-cd niko-cli
-make install
+cargo install --path .
 ```
 
 ---
