@@ -159,6 +159,7 @@ Command:"#,
 }
 
 /// Build the system prompt for explaining a command
+#[allow(dead_code)]
 pub fn cmd_explain_prompt() -> String {
     r#"You are a senior DevOps/systems engineer. The user will ask about a shell command or tool.
 

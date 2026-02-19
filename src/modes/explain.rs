@@ -43,11 +43,7 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
 
     let line_count = code.lines().count();
     eprintln!();
-    eprintln!(
-        "  {} Analyzing {} lines…",
-        "📖".to_string(),
-        line_count.to_string().cyan()
-    );
+    eprintln!("  📖 Analyzing {} lines…", line_count.to_string().cyan());
 
     let provider = llm::get_provider(provider_override)?;
 

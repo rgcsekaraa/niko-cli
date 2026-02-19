@@ -94,11 +94,7 @@ pub fn chunk_code(code: &str) -> Vec<CodeChunk> {
         }
 
         let context_prefix = if !chunks.is_empty() {
-            let ctx_start = if start >= CONTEXT_OVERLAP_LINES {
-                start - CONTEXT_OVERLAP_LINES
-            } else {
-                0
-            };
+            let ctx_start = start.saturating_sub(CONTEXT_OVERLAP_LINES);
             let ctx_lines = &lines[ctx_start..start];
             format!(
                 "// [context: preceding lines {}-{} shown for continuity]\n{}\n// [chunk starts here]\n",

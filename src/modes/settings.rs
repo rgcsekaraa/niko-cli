@@ -137,7 +137,7 @@ fn run_configure_wizard() -> Result<()> {
     eprintln!();
     ui::box_top(&format!("{}", "Configure Provider".bold()));
     ui::box_empty();
-    ui::box_line(&"Select a provider to configure:".to_string());
+    ui::box_line("Select a provider to configure:");
     ui::box_empty();
 
     for (i, (name, _, _, _)) in templates.iter().enumerate() {
@@ -147,10 +147,10 @@ fn run_configure_wizard() -> Result<()> {
             "API key".dimmed().to_string()
         };
         ui::box_line(&format!(
-            "  {}  {}  {}",
+            "  {}  {}  ({})",
             format!("{:>2}.", i + 1).dimmed(),
             name.bold(),
-            format!("({})", tag)
+            tag
         ));
     }
     ui::box_line(&format!(

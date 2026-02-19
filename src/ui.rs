@@ -184,6 +184,7 @@ impl Spinner {
     }
 
     /// Update the spinner message
+    #[allow(dead_code)]
     pub fn set_message(&mut self, msg: &str) {
         self.message = msg.to_string();
     }
@@ -282,7 +283,7 @@ pub fn read_stdin_input() -> io::Result<String> {
     eprint!("\r\x1b[K");
 
     // Remove trailing empty lines
-    while lines.last().map_or(false, |l| l.is_empty()) {
+    while lines.last().is_some_and(|l| l.is_empty()) {
         lines.pop();
     }
 
@@ -360,26 +361,24 @@ pub fn show_code_preview(code: &str) -> bool {
     let _ = io::stderr().flush();
 
     let mut input = String::new();
-    if io::stdin().read_line(&mut input).is_ok() {
-        if input.trim().is_empty() {
-            // Expand — show all lines
-            eprintln!();
-            box_top(&format!(
-                "{}",
-                format!("Code ({} lines) — expanded", count).dimmed()
-            ));
-            for (i, line) in lines.iter().enumerate() {
-                let line_num = format!("{:>4}", i + 1).dimmed();
-                let truncated = if line.len() > BOX_WIDTH - 8 {
-                    format!("{}…", &line[..BOX_WIDTH - 9])
-                } else {
-                    line.to_string()
-                };
-                box_line(&format!("{} {}", line_num, truncated.dimmed()));
-            }
-            box_bottom();
-            return true;
+    if io::stdin().read_line(&mut input).is_ok() && input.trim().is_empty() {
+        // Expand — show all lines
+        eprintln!();
+        box_top(&format!(
+            "{}",
+            format!("Code ({} lines) — expanded", count).dimmed()
+        ));
+        for (i, line) in lines.iter().enumerate() {
+            let line_num = format!("{:>4}", i + 1).dimmed();
+            let truncated = if line.len() > BOX_WIDTH - 8 {
+                format!("{}…", &line[..BOX_WIDTH - 9])
+            } else {
+                line.to_string()
+            };
+            box_line(&format!("{} {}", line_num, truncated.dimmed()));
         }
+        box_bottom();
+        return true;
     }
 
     false
@@ -477,6 +476,7 @@ pub fn display_command(command: &str) {
 
 // ─── Prompt input ───────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub fn prompt_input(prompt: &str) -> io::Result<String> {
     eprint!("{}", prompt);
     io::stderr().flush()?;

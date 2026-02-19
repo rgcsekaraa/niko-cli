@@ -23,6 +23,7 @@ impl std::fmt::Display for RiskLevel {
 }
 
 impl RiskLevel {
+    #[allow(dead_code)]
     pub fn description(&self) -> &str {
         match self {
             Self::Safe => "Read-only command, safe to execute",
@@ -275,6 +276,7 @@ pub fn extract_command(response: &str) -> String {
 }
 
 /// Check if a command is blocked
+#[allow(dead_code)]
 pub fn is_blocked(command: &str) -> bool {
     let cfg = config::get();
     cfg.safety
