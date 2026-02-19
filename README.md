@@ -10,7 +10,7 @@ find . -type f -size +100M
 Copied to clipboard
 
 $ cat main.rs | niko explain
-📖 42 lines analyzed
+📖 42 lines analyzed — completed in 2.1s
 ## Overview
 ...
 ```
@@ -24,7 +24,9 @@ $ cat main.rs | niko explain
 - **Dynamic Model Selection** — Fetches available models from the API, no hardcoded lists
 - **RAM-Based Restrictions** — Prevents selecting models too large for your hardware
 - **Auto-Install Ollama** — Installs Ollama automatically if not present
-- **Code Explanation** — Handles files of any size with smart chunking at function boundaries
+- **Smart Code Chunking** — Splits large files at function boundaries with context memory between chunks
+- **Automatic Retry** — Exponential backoff for transient failures (timeouts, rate limits, 5xx errors)
+- **Connection Pooling** — Keep-alive HTTP connections for fast sequential LLM calls
 - **Command Generation** — Natural language → shell commands, auto-copied to clipboard
 - **Safety Warnings** — Flags dangerous commands before execution
 - **Cross-Platform** — macOS, Linux (Ubuntu/Debian/etc.), Windows
@@ -94,11 +96,15 @@ niko explain -f src/main.rs
 # Pipe code in
 cat complex_module.py | niko explain
 
-# Paste interactively (Ctrl-D or two empty lines to finish)
+# Paste interactively (live line counter, Ctrl-D or two empty lines to finish)
 niko explain
 ```
 
-Handles any amount of code — splits at function boundaries, processes in parallel, then synthesises a final explanation.
+For large files, Niko:
+1. **Chunks** code at function/block boundaries (max 200 lines/chunk)
+2. **Carries context** — each chunk includes overlapping lines and a running summary from previous chunks
+3. **Retries** failed LLM calls with exponential backoff (3 attempts, 500ms → 4s delay)
+4. **Synthesises** chunk analyses into an overall summary with follow-up questions
 
 ### `settings` — Configuration
 
@@ -127,6 +133,23 @@ niko settings path
 niko cmd "list files" --provider openai
 niko explain -f main.rs --provider claude
 ```
+
+---
+
+## Reliability
+
+Niko is designed for production use with several reliability features:
+
+| Feature | Details |
+|---------|---------|
+| **Retry** | 3 attempts with exponential backoff (500ms, 1s, 2s + jitter) |
+| **Retryable errors** | Timeouts, connection resets, 429/5xx, rate limits, model loading |
+| **Connection pooling** | HTTP keep-alive with 4 idle connections per host, 90s timeout |
+| **Empty response guard** | Detects and retries empty/null responses from LLMs |
+| **Truncation detection** | Warns when response hits max_tokens (Claude stop_reason, OpenAI finish_reason) |
+| **Adaptive context** | Ollama context window scales with prompt size (4K → 16K) |
+| **Context memory** | Multi-chunk explanations carry 10-line overlap + running summaries |
+| **Structured errors** | Parses API error responses for clear, actionable messages |
 
 ---
 
