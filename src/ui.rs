@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead, IsTerminal, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -197,12 +197,7 @@ impl Drop for Spinner {
 }
 
 fn atty_is_terminal() -> bool {
-    unsafe { libc_isatty(2) != 0 }
-}
-
-extern "C" {
-    #[link_name = "isatty"]
-    fn libc_isatty(fd: i32) -> i32;
+    io::stderr().is_terminal()
 }
 
 // ─── Clipboard ──────────────────────────────────────────────────────────────
@@ -218,7 +213,7 @@ pub fn copy_to_clipboard(text: &str) -> bool {
 
 /// Check if stdin is a terminal (not piped)
 fn stdin_is_terminal() -> bool {
-    unsafe { libc_isatty(0) != 0 }
+    io::stdin().is_terminal()
 }
 
 /// Read all input from stdin — handles both piped input and interactive paste.
