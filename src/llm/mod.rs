@@ -1,11 +1,11 @@
+pub mod claude;
 pub mod ollama;
 pub mod openai_compat;
-pub mod claude;
 
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
 use crate::config::{self, ProviderConfig};
 
@@ -107,12 +107,17 @@ pub fn generate_with_retry(
                         let delay = retry_delay(attempt);
                         eprintln!(
                             "  ↻ Empty response, retrying in {:.1}s… ({}/{})",
-                            delay.as_secs_f64(), attempt + 1, MAX_RETRIES
+                            delay.as_secs_f64(),
+                            attempt + 1,
+                            MAX_RETRIES
                         );
                         thread::sleep(delay);
                         continue;
                     }
-                    bail!("Provider returned empty response after {} attempts", MAX_RETRIES + 1);
+                    bail!(
+                        "Provider returned empty response after {} attempts",
+                        MAX_RETRIES + 1
+                    );
                 }
                 return Ok(trimmed.to_string());
             }
@@ -121,7 +126,10 @@ pub fn generate_with_retry(
                     let delay = retry_delay(attempt);
                     eprintln!(
                         "  ↻ {}, retrying in {:.1}s… ({}/{})",
-                        summarize_error(&e), delay.as_secs_f64(), attempt + 1, MAX_RETRIES
+                        summarize_error(&e),
+                        delay.as_secs_f64(),
+                        attempt + 1,
+                        MAX_RETRIES
                     );
                     thread::sleep(delay);
                     last_err = Some(e);
@@ -174,7 +182,11 @@ fn retry_delay(attempt: u32) -> Duration {
 
 fn summarize_error(err: &anyhow::Error) -> String {
     let full = format!("{:#}", err);
-    if full.len() > 80 { format!("{}…", &full[..77]) } else { full }
+    if full.len() > 80 {
+        format!("{}…", &full[..77])
+    } else {
+        full
+    }
 }
 
 // ─── Provider factory ───────────────────────────────────────────────────────
@@ -187,21 +199,28 @@ pub fn from_config(name: &str, pcfg: &ProviderConfig) -> Result<Box<dyn Provider
             } else {
                 &pcfg.base_url
             };
-            Ok(Box::new(ollama::OllamaProvider::new(base_url, &pcfg.model)?))
+            Ok(Box::new(ollama::OllamaProvider::new(
+                base_url,
+                &pcfg.model,
+            )?))
         }
-        "openai_compat" => {
-            Ok(Box::new(openai_compat::OpenAICompatProvider::new(
-                name, &pcfg.api_key, &pcfg.base_url, &pcfg.model,
-            )))
-        }
-        "anthropic" => {
-            Ok(Box::new(claude::ClaudeProvider::new(&pcfg.api_key, &pcfg.model)))
-        }
+        "openai_compat" => Ok(Box::new(openai_compat::OpenAICompatProvider::new(
+            name,
+            &pcfg.api_key,
+            &pcfg.base_url,
+            &pcfg.model,
+        ))),
+        "anthropic" => Ok(Box::new(claude::ClaudeProvider::new(
+            &pcfg.api_key,
+            &pcfg.model,
+        ))),
         "" => bail!(
-            "Provider '{}' has no kind set.\nRun 'niko settings configure' to set it up.", name
+            "Provider '{}' has no kind set.\nRun 'niko settings configure' to set it up.",
+            name
         ),
         other => bail!(
-            "Unknown provider kind: '{}'\nSupported: ollama, openai_compat, anthropic", other
+            "Unknown provider kind: '{}'\nSupported: ollama, openai_compat, anthropic",
+            other
         ),
     }
 }
@@ -215,10 +234,12 @@ pub fn get_provider(override_name: Option<&str>) -> Result<Box<dyn Provider>> {
     match override_name {
         Some(name) => {
             let cfg = config::load()?;
-            let pcfg = cfg.providers.get(name)
-                .ok_or_else(|| anyhow::anyhow!(
-                    "Provider '{}' not configured.\nRun 'niko settings configure' to add it.", name
-                ))?;
+            let pcfg = cfg.providers.get(name).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Provider '{}' not configured.\nRun 'niko settings configure' to add it.",
+                    name
+                )
+            })?;
             from_config(name, pcfg)
         }
         None => get_active_provider(),
@@ -231,7 +252,9 @@ pub fn estimate_param_billions(model_name: &str, size_bytes: u64) -> f64 {
     let lower = model_name.to_lowercase();
     for token in lower.split(&[':', '-', '_', '.'][..]) {
         if let Some(num_str) = token.strip_suffix('b') {
-            if let Ok(n) = num_str.parse::<f64>() { return n; }
+            if let Ok(n) = num_str.parse::<f64>() {
+                return n;
+            }
         }
     }
     if size_bytes > 0 {
@@ -241,7 +264,9 @@ pub fn estimate_param_billions(model_name: &str, size_bytes: u64) -> f64 {
 }
 
 pub fn model_fits_in_ram(param_billions: f64) -> bool {
-    if param_billions <= 0.0 { return true; }
+    if param_billions <= 0.0 {
+        return true;
+    }
     let max = config::max_model_size_for_ram() as f64;
     param_billions <= max
 }

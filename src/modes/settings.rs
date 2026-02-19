@@ -5,8 +5,8 @@ use colored::*;
 
 use crate::config::{self, ProviderConfig};
 use crate::llm;
-use crate::llm::Provider;
 use crate::llm::ollama;
+use crate::llm::Provider;
 use crate::ui;
 
 /// Settings action types
@@ -45,7 +45,11 @@ fn show_config() -> Result<()> {
     ui::box_kv("  Config", &format!("{}", config::config_path().display()));
     ui::box_kv(
         "  System",
-        &format!("{}GB RAM  •  {} cores", config::system_ram_gb(), config::cpu_count()),
+        &format!(
+            "{}GB RAM  •  {} cores",
+            config::system_ram_gb(),
+            config::cpu_count()
+        ),
     );
     ui::box_kv(
         "  Limit ",
@@ -55,10 +59,7 @@ fn show_config() -> Result<()> {
     ui::box_sep();
 
     // Active provider
-    ui::box_kv_bold(
-        "  Active",
-        &cfg.active_provider.cyan().bold().to_string(),
-    );
+    ui::box_kv_bold("  Active", &cfg.active_provider.cyan().bold().to_string());
 
     ui::box_sep();
 
@@ -112,8 +113,16 @@ fn show_config() -> Result<()> {
     }
 
     ui::box_sep();
-    ui::box_line(&"  niko settings configure  — setup providers".dimmed().to_string());
-    ui::box_line(&"  niko settings set <key>  — change values".dimmed().to_string());
+    ui::box_line(
+        &"  niko settings configure  — setup providers"
+            .dimmed()
+            .to_string(),
+    );
+    ui::box_line(
+        &"  niko settings set <key>  — change values"
+            .dimmed()
+            .to_string(),
+    );
     ui::box_bottom();
     eprintln!();
 
@@ -137,7 +146,12 @@ fn run_configure_wizard() -> Result<()> {
         } else {
             "API key".dimmed().to_string()
         };
-        ui::box_line(&format!("  {}  {}  {}", format!("{:>2}.", i + 1).dimmed(), name.bold(), format!("({})", tag)));
+        ui::box_line(&format!(
+            "  {}  {}  {}",
+            format!("{:>2}.", i + 1).dimmed(),
+            name.bold(),
+            format!("({})", tag)
+        ));
     }
     ui::box_line(&format!(
         "  {}  {}",
@@ -202,22 +216,28 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
 
         let wait = prompt_input("  Start Ollama and press Enter, or 'q' to skip: ")?;
         if wait.trim() == "q" {
-            config::upsert_provider(name, ProviderConfig {
-                kind: "ollama".into(),
-                base_url: default_url.into(),
-                ..Default::default()
-            })?;
+            config::upsert_provider(
+                name,
+                ProviderConfig {
+                    kind: "ollama".into(),
+                    base_url: default_url.into(),
+                    ..Default::default()
+                },
+            )?;
             config::set_active_provider(name)?;
             ui::print_success("Saved (select model later)");
             return Ok(());
         }
 
         if !ollama::is_ollama_running() {
-            config::upsert_provider(name, ProviderConfig {
-                kind: "ollama".into(),
-                base_url: default_url.into(),
-                ..Default::default()
-            })?;
+            config::upsert_provider(
+                name,
+                ProviderConfig {
+                    kind: "ollama".into(),
+                    base_url: default_url.into(),
+                    ..Default::default()
+                },
+            )?;
             config::set_active_provider(name)?;
             ui::print_warning("Still not running. Config saved anyway.");
             return Ok(());
@@ -227,14 +247,8 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
     // System info
     let max_b = config::max_model_size_for_ram();
     ui::box_empty();
-    ui::box_kv(
-        "  RAM      ",
-        &format!("{}GB", config::system_ram_gb()),
-    );
-    ui::box_kv(
-        "  Max model",
-        &format!("~{}B parameters", max_b),
-    );
+    ui::box_kv("  RAM      ", &format!("{}GB", config::system_ram_gb()));
+    ui::box_kv("  Max model", &format!("~{}B parameters", max_b));
     ui::box_sep();
 
     // List local models
@@ -250,7 +264,12 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
             } else {
                 String::new()
             };
-            ui::box_line(&format!("  {}  {}{}", format!("{:>2}.", i + 1).dimmed(), m, warn));
+            ui::box_line(&format!(
+                "  {}  {}{}",
+                format!("{:>2}.", i + 1).dimmed(),
+                m,
+                warn
+            ));
         }
         ui::box_sep();
     }
@@ -268,7 +287,12 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
 
     for (i, m) in filtered.iter().enumerate() {
         let num = local_models.len() + i + 1;
-        ui::box_line(&format!("  {}  {} {}", format!("{:>2}.", num).dimmed(), m, "↓".dimmed()));
+        ui::box_line(&format!(
+            "  {}  {} {}",
+            format!("{:>2}.", num).dimmed(),
+            m,
+            "↓".dimmed()
+        ));
     }
 
     ui::box_empty();
@@ -301,7 +325,9 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
         eprintln!();
         ui::print_warning(&format!(
             "Model '{}' ({:.0}B params) may exceed {}GB RAM",
-            selected_model, param_b, config::system_ram_gb()
+            selected_model,
+            param_b,
+            config::system_ram_gb()
         ));
         let proceed = prompt_input("  Continue anyway? [y/N]: ")?;
         if !proceed.trim().to_lowercase().starts_with('y') {
@@ -310,12 +336,15 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
         }
     }
 
-    config::upsert_provider(name, ProviderConfig {
-        kind: "ollama".into(),
-        base_url: default_url.into(),
-        model: selected_model.clone(),
-        ..Default::default()
-    })?;
+    config::upsert_provider(
+        name,
+        ProviderConfig {
+            kind: "ollama".into(),
+            base_url: default_url.into(),
+            model: selected_model.clone(),
+            ..Default::default()
+        },
+    )?;
     config::set_active_provider(name)?;
 
     eprintln!();
@@ -342,7 +371,10 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
 
     let api_key = if let Some(ref key) = existing_key {
         ui::box_empty();
-        ui::box_line(&format!("  Found key in {}", format!("${}", env_var).cyan()));
+        ui::box_line(&format!(
+            "  Found key in {}",
+            format!("${}", env_var).cyan()
+        ));
         ui::box_bottom();
         eprintln!();
 
@@ -358,7 +390,10 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
         ui::box_empty();
         ui::box_line(&format!("  {} required", "API key".bold()));
         if !env_var.is_empty() {
-            ui::box_line(&format!("  Or set: {}", format!("export {}=...", env_var).dimmed()));
+            ui::box_line(&format!(
+                "  Or set: {}",
+                format!("export {}=...", env_var).dimmed()
+            ));
         }
         ui::box_bottom();
         eprintln!();
@@ -404,7 +439,12 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
                 } else {
                     String::new()
                 };
-                ui::box_line(&format!("  {}  {}{}", format!("{:>2}.", i + 1).dimmed(), m.name, warn));
+                ui::box_line(&format!(
+                    "  {}  {}{}",
+                    format!("{:>2}.", i + 1).dimmed(),
+                    m.name,
+                    warn
+                ));
             }
             if models.len() > 30 {
                 ui::box_line(&format!("  ... and {} more", models.len() - 30));
@@ -431,11 +471,7 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
                 config::set_provider_field(name, "model", &selected)?;
                 config::set_active_provider(name)?;
                 eprintln!();
-                ui::print_success(&format!(
-                    "Configured {} → {}",
-                    name.bold(),
-                    selected.cyan()
-                ));
+                ui::print_success(&format!("Configured {} → {}", name.bold(), selected.cyan()));
             }
         }
         Ok(_) => {
@@ -444,11 +480,7 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
             if !model.is_empty() {
                 config::set_provider_field(name, "model", &model)?;
                 config::set_active_provider(name)?;
-                ui::print_success(&format!(
-                    "Configured {} → {}",
-                    name.bold(),
-                    model.cyan()
-                ));
+                ui::print_success(&format!("Configured {} → {}", name.bold(), model.cyan()));
             }
         }
         Err(e) => {
@@ -457,11 +489,7 @@ fn configure_api_provider(name: &str, kind: &str, default_url: &str, env_var: &s
             if !model.is_empty() {
                 config::set_provider_field(name, "model", &model)?;
                 config::set_active_provider(name)?;
-                ui::print_success(&format!(
-                    "Configured {} → {}",
-                    name.bold(),
-                    model.cyan()
-                ));
+                ui::print_success(&format!("Configured {} → {}", name.bold(), model.cyan()));
             }
         }
     }
@@ -478,16 +506,12 @@ fn configure_custom() -> Result<()> {
     ui::box_bottom();
     eprintln!();
 
-    let name = prompt_input("  Provider name: ")?
-        .trim()
-        .to_lowercase();
+    let name = prompt_input("  Provider name: ")?.trim().to_lowercase();
     if name.is_empty() {
         return Ok(());
     }
 
-    let base_url = prompt_input("  Base URL: ")?
-        .trim()
-        .to_string();
+    let base_url = prompt_input("  Base URL: ")?.trim().to_string();
     if base_url.is_empty() {
         return Ok(());
     }
@@ -496,25 +520,22 @@ fn configure_custom() -> Result<()> {
         .trim()
         .to_string();
 
-    let model = prompt_input("  Model: ")?
-        .trim()
-        .to_string();
+    let model = prompt_input("  Model: ")?.trim().to_string();
 
-    config::upsert_provider(&name, ProviderConfig {
-        kind: "openai_compat".into(),
-        api_key,
-        base_url,
-        model: model.clone(),
-        ..Default::default()
-    })?;
+    config::upsert_provider(
+        &name,
+        ProviderConfig {
+            kind: "openai_compat".into(),
+            api_key,
+            base_url,
+            model: model.clone(),
+            ..Default::default()
+        },
+    )?;
     config::set_active_provider(&name)?;
 
     eprintln!();
-    ui::print_success(&format!(
-        "Configured {} → {}",
-        name.bold(),
-        model.cyan()
-    ));
+    ui::print_success(&format!("Configured {} → {}", name.bold(), model.cyan()));
     eprintln!();
 
     Ok(())
@@ -544,7 +565,12 @@ fn set_config(key: &str, value: &str) -> Result<()> {
         config::set_provider_field(provider, field, value)?;
 
         if field.contains("key") {
-            ui::print_success(&format!("{}.{} → {}", provider, field, "configured".green()));
+            ui::print_success(&format!(
+                "{}.{} → {}",
+                provider,
+                field,
+                "configured".green()
+            ));
         } else {
             ui::print_success(&format!("{}.{} → {}", provider, field, value.cyan()));
         }
@@ -559,7 +585,10 @@ fn init_config() -> Result<()> {
     let cfg = config::default_config();
     config::save(&cfg)?;
 
-    ui::print_success(&format!("Config created: {}", config::config_path().display()));
+    ui::print_success(&format!(
+        "Config created: {}",
+        config::config_path().display()
+    ));
     ui::print_dim("  Run 'niko settings configure' to set up a provider");
 
     Ok(())
@@ -582,5 +611,8 @@ fn prompt_input(prompt: &str) -> Result<String> {
     io::stderr().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    Ok(input.trim_end_matches('\n').trim_end_matches('\r').to_string())
+    Ok(input
+        .trim_end_matches('\n')
+        .trim_end_matches('\r')
+        .to_string())
 }

@@ -92,15 +92,55 @@ impl Default for UiConfig {
 pub fn known_provider_templates() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
     // (name, kind, default_base_url, env_var_for_key)
     vec![
-        ("ollama",     "ollama",        "http://127.0.0.1:11434", ""),
-        ("openai",     "openai_compat", "https://api.openai.com/v1", "OPENAI_API_KEY"),
-        ("claude",     "anthropic",     "https://api.anthropic.com", "ANTHROPIC_API_KEY"),
-        ("deepseek",   "openai_compat", "https://api.deepseek.com/v1", "DEEPSEEK_API_KEY"),
-        ("grok",       "openai_compat", "https://api.x.ai/v1", "GROK_API_KEY"),
-        ("groq",       "openai_compat", "https://api.groq.com/openai/v1", "GROQ_API_KEY"),
-        ("together",   "openai_compat", "https://api.together.xyz/v1", "TOGETHER_API_KEY"),
-        ("mistral",    "openai_compat", "https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
-        ("openrouter", "openai_compat", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+        ("ollama", "ollama", "http://127.0.0.1:11434", ""),
+        (
+            "openai",
+            "openai_compat",
+            "https://api.openai.com/v1",
+            "OPENAI_API_KEY",
+        ),
+        (
+            "claude",
+            "anthropic",
+            "https://api.anthropic.com",
+            "ANTHROPIC_API_KEY",
+        ),
+        (
+            "deepseek",
+            "openai_compat",
+            "https://api.deepseek.com/v1",
+            "DEEPSEEK_API_KEY",
+        ),
+        (
+            "grok",
+            "openai_compat",
+            "https://api.x.ai/v1",
+            "GROK_API_KEY",
+        ),
+        (
+            "groq",
+            "openai_compat",
+            "https://api.groq.com/openai/v1",
+            "GROQ_API_KEY",
+        ),
+        (
+            "together",
+            "openai_compat",
+            "https://api.together.xyz/v1",
+            "TOGETHER_API_KEY",
+        ),
+        (
+            "mistral",
+            "openai_compat",
+            "https://api.mistral.ai/v1",
+            "MISTRAL_API_KEY",
+        ),
+        (
+            "openrouter",
+            "openai_compat",
+            "https://openrouter.ai/api/v1",
+            "OPENROUTER_API_KEY",
+        ),
     ]
 }
 
@@ -147,13 +187,16 @@ pub fn default_config() -> Config {
     let mut providers = HashMap::new();
 
     // Only add Ollama as a default offline provider — no hardcoded models
-    providers.insert("ollama".into(), ProviderConfig {
-        kind: "ollama".into(),
-        api_key: String::new(),
-        base_url: "http://127.0.0.1:11434".into(),
-        model: String::new(), // will be selected dynamically
-        options: HashMap::new(),
-    });
+    providers.insert(
+        "ollama".into(),
+        ProviderConfig {
+            kind: "ollama".into(),
+            api_key: String::new(),
+            base_url: "http://127.0.0.1:11434".into(),
+            model: String::new(), // will be selected dynamically
+            options: HashMap::new(),
+        },
+    );
 
     Config {
         active_provider: "ollama".into(),
@@ -181,8 +224,8 @@ pub fn load() -> Result<Config> {
     let content = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read config: {}", path.display()))?;
 
-    let mut cfg: Config = serde_yaml::from_str(&content)
-        .with_context(|| "Failed to parse config YAML")?;
+    let mut cfg: Config =
+        serde_yaml::from_str(&content).with_context(|| "Failed to parse config YAML")?;
 
     // Overlay env vars on matching providers
     for (name, _, _, env_var) in known_provider_templates() {
@@ -207,8 +250,7 @@ pub fn save(cfg: &Config) -> Result<()> {
     fs::create_dir_all(&dir)
         .with_context(|| format!("Failed to create config directory: {}", dir.display()))?;
 
-    let yaml = serde_yaml::to_string(cfg)
-        .with_context(|| "Failed to serialize config")?;
+    let yaml = serde_yaml::to_string(cfg).with_context(|| "Failed to serialize config")?;
 
     fs::write(&path, yaml)
         .with_context(|| format!("Failed to write config: {}", path.display()))?;

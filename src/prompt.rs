@@ -26,7 +26,8 @@ pub fn gather_context() -> SystemContext {
 /// Build the system prompt for command generation mode
 pub fn cmd_system_prompt(ctx: &SystemContext) -> String {
     let os_specific = match ctx.os.as_str() {
-        "macos" => r#"
+        "macos" => {
+            r#"
 OS-SPECIFIC NOTES (macOS):
 - Use `open` instead of `xdg-open`
 - `sed -i ''` needs empty string arg (BSD sed)
@@ -34,21 +35,26 @@ OS-SPECIFIC NOTES (macOS):
 - `brew` is the primary package manager
 - Use `caffeinate` to prevent sleep
 - `dscacheutil -flushcache` to flush DNS
-- `diskutil` instead of `fdisk`"#,
-        "linux" => r#"
+- `diskutil` instead of `fdisk`"#
+        }
+        "linux" => {
+            r#"
 OS-SPECIFIC NOTES (Linux):
 - Use `xdg-open` to open files/URLs
 - `sed -i` works directly (GNU sed)
 - Use `xclip` or `xsel` for clipboard
 - `systemctl` for service management
-- `apt`/`dnf`/`pacman` depending on distro"#,
-        "windows" => r#"
+- `apt`/`dnf`/`pacman` depending on distro"#
+        }
+        "windows" => {
+            r#"
 OS-SPECIFIC NOTES (Windows):
 - Use PowerShell syntax when possible
 - `Start-Process` or `Invoke-Item` to open files
 - `Set-Clipboard` / `Get-Clipboard` for clipboard
 - `winget` or `choco` for package management
-- Use backslashes for paths or quote forward slashes"#,
+- Use backslashes for paths or quote forward slashes"#
+        }
         _ => "",
     };
 
@@ -204,30 +210,90 @@ fn detect_shell() -> String {
 fn detect_tools() -> Vec<String> {
     let tools = [
         // Version control
-        "git", "gh", "svn",
+        "git",
+        "gh",
+        "svn",
         // Containers
-        "docker", "docker-compose", "podman", "kubectl", "helm", "k9s", "minikube",
+        "docker",
+        "docker-compose",
+        "podman",
+        "kubectl",
+        "helm",
+        "k9s",
+        "minikube",
         // Package managers
-        "npm", "yarn", "pnpm", "bun", "pip", "pip3", "pipenv", "poetry",
-        "go", "cargo", "brew", "apt", "dnf", "pacman",
+        "npm",
+        "yarn",
+        "pnpm",
+        "bun",
+        "pip",
+        "pip3",
+        "pipenv",
+        "poetry",
+        "go",
+        "cargo",
+        "brew",
+        "apt",
+        "dnf",
+        "pacman",
         // Languages
-        "python", "python3", "node", "deno", "ruby", "php", "java",
+        "python",
+        "python3",
+        "node",
+        "deno",
+        "ruby",
+        "php",
+        "java",
         // Build tools
-        "make", "cmake", "mvn", "gradle",
+        "make",
+        "cmake",
+        "mvn",
+        "gradle",
         // Cloud
-        "terraform", "ansible", "aws", "gcloud", "az", "flyctl", "vercel",
+        "terraform",
+        "ansible",
+        "aws",
+        "gcloud",
+        "az",
+        "flyctl",
+        "vercel",
         // Databases
-        "psql", "mysql", "mongo", "redis-cli", "sqlite3",
+        "psql",
+        "mysql",
+        "mongo",
+        "redis-cli",
+        "sqlite3",
         // HTTP & networking
-        "curl", "wget", "ssh", "scp", "rsync", "nc", "lsof",
+        "curl",
+        "wget",
+        "ssh",
+        "scp",
+        "rsync",
+        "nc",
+        "lsof",
         // Text & search
-        "jq", "yq", "fzf", "rg", "fd", "awk", "sed", "grep",
+        "jq",
+        "yq",
+        "fzf",
+        "rg",
+        "fd",
+        "awk",
+        "sed",
+        "grep",
         // Compression
-        "tar", "zip", "unzip", "gzip",
+        "tar",
+        "zip",
+        "unzip",
+        "gzip",
         // System
-        "htop", "top", "ps", "df", "du",
+        "htop",
+        "top",
+        "ps",
+        "df",
+        "du",
         // Media
-        "ffmpeg", "convert",
+        "ffmpeg",
+        "convert",
     ];
 
     tools
@@ -255,28 +321,45 @@ const MAX_HELP_CHARS: usize = 3000;
 /// Tools we skip --help for (builtins, shells, common unix tools the LLM already knows)
 const SKIP_HELP: &[&str] = &[
     // Shells & builtins
-    "sh", "bash", "zsh", "fish", "csh", "tcsh", "pwsh", "cmd",
-    "cd", "echo", "export", "source", "alias", "true", "false", "yes",
-    // File basics — the LLM knows these perfectly
-    "cat", "ls", "cp", "mv", "rm", "mkdir", "rmdir", "touch", "ln",
-    "chmod", "chown", "chgrp", "pwd", "whoami", "hostname",
-    // Process basics
+    "sh", "bash", "zsh", "fish", "csh", "tcsh", "pwsh", "cmd", "cd", "echo", "export", "source",
+    "alias", "true", "false", "yes", // File basics — the LLM knows these perfectly
+    "cat", "ls", "cp", "mv", "rm", "mkdir", "rmdir", "touch", "ln", "chmod", "chown", "chgrp",
+    "pwd", "whoami", "hostname", // Process basics
     "ps", "top", "htop", "df", "du", "free", "kill",
     // Text basics — the LLM knows these
-    "head", "tail", "sort", "uniq", "wc", "tr", "cut", "paste",
-    "tee", "xargs", "grep", "sed", "awk", "find", "diff",
-    // Compression basics
-    "tar", "gzip", "zip", "unzip",
-    // These produce huge/unhelpful output
+    "head", "tail", "sort", "uniq", "wc", "tr", "cut", "paste", "tee", "xargs", "grep", "sed",
+    "awk", "find", "diff", // Compression basics
+    "tar", "gzip", "zip", "unzip", // These produce huge/unhelpful output
     "python", "python3", "node", "ruby", "php", "java",
 ];
 
 /// Multi-subcommand tools that support `tool subcommand --help`
 const SUBCOMMAND_TOOLS: &[&str] = &[
-    "docker", "kubectl", "git", "cargo", "npm", "yarn", "pnpm", "bun",
-    "pip", "pip3", "go", "terraform", "aws", "gcloud", "az",
-    "helm", "flyctl", "vercel", "brew", "podman", "gh",
-    "poetry", "pipenv", "minikube", "ansible",
+    "docker",
+    "kubectl",
+    "git",
+    "cargo",
+    "npm",
+    "yarn",
+    "pnpm",
+    "bun",
+    "pip",
+    "pip3",
+    "go",
+    "terraform",
+    "aws",
+    "gcloud",
+    "az",
+    "helm",
+    "flyctl",
+    "vercel",
+    "brew",
+    "podman",
+    "gh",
+    "poetry",
+    "pipenv",
+    "minikube",
+    "ansible",
 ];
 
 /// Discover tool help for tools mentioned in the user's query.
@@ -297,19 +380,24 @@ pub fn discover_tool_help(query: &str, verbose: bool) -> String {
     for pair in words.windows(2) {
         let base = normalize_tool_word(pair[0]);
         let sub = normalize_tool_word(pair[1]);
-        if base.is_empty() || sub.is_empty() { continue; }
+        if base.is_empty() || sub.is_empty() {
+            continue;
+        }
 
         if SUBCOMMAND_TOOLS.contains(&base.as_str()) {
             let key = format!("{} {}", base, sub);
             if !seen_tools.contains(&key) && which(&base) {
                 if let Some(help_text) = get_subcommand_help(&base, &sub) {
                     if verbose {
-                        eprintln!("  [help] captured `{} {} --help` ({} chars)", base, sub, help_text.len());
+                        eprintln!(
+                            "  [help] captured `{} {} --help` ({} chars)",
+                            base,
+                            sub,
+                            help_text.len()
+                        );
                     }
-                    help_sections.push(format!(
-                        "TOOL REFERENCE: `{} {}`\n{}",
-                        base, sub, help_text
-                    ));
+                    help_sections
+                        .push(format!("TOOL REFERENCE: `{} {}`\n{}", base, sub, help_text));
                     seen_tools.insert(key);
                     seen_tools.insert(base.clone());
                 }
@@ -320,14 +408,24 @@ pub fn discover_tool_help(query: &str, verbose: bool) -> String {
     // Second pass: single-word tools
     for word in &words {
         let tool = normalize_tool_word(word);
-        if tool.is_empty() || tool.len() < 2 { continue; }
-        if seen_tools.contains(&tool) { continue; }
-        if SKIP_HELP.contains(&tool.as_str()) { continue; }
+        if tool.is_empty() || tool.len() < 2 {
+            continue;
+        }
+        if seen_tools.contains(&tool) {
+            continue;
+        }
+        if SKIP_HELP.contains(&tool.as_str()) {
+            continue;
+        }
 
         if which(&tool) {
             if let Some(help_text) = get_tool_help(&tool) {
                 if verbose {
-                    eprintln!("  [help] captured `{} --help` ({} chars)", tool, help_text.len());
+                    eprintln!(
+                        "  [help] captured `{} --help` ({} chars)",
+                        tool,
+                        help_text.len()
+                    );
                 }
                 help_sections.push(format!("TOOL REFERENCE: `{}`\n{}", tool, help_text));
                 seen_tools.insert(tool);
@@ -399,9 +497,15 @@ fn run_help_command(cmd: &str, args: &[&str]) -> Option<String> {
 
     let trimmed = text.trim();
     // Reject if too short or clearly an error
-    if trimmed.len() < 30 { return None; }
-    if trimmed.starts_with("error:") || trimmed.starts_with("Error:") { return None; }
-    if trimmed.starts_with("command not found") { return None; }
+    if trimmed.len() < 30 {
+        return None;
+    }
+    if trimmed.starts_with("error:") || trimmed.starts_with("Error:") {
+        return None;
+    }
+    if trimmed.starts_with("command not found") {
+        return None;
+    }
 
     Some(trimmed.to_string())
 }

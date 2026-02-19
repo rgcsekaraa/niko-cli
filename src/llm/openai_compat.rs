@@ -1,10 +1,10 @@
 use std::io::{BufRead, BufReader};
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-use crate::llm::{Provider, ModelInfo, estimate_param_billions};
+use crate::llm::{estimate_param_billions, ModelInfo, Provider};
 
 /// OpenAI-compatible provider with SSE streaming support
 pub struct OpenAICompatProvider {
@@ -106,9 +106,13 @@ impl OpenAICompatProvider {
 }
 
 impl Provider for OpenAICompatProvider {
-    fn name(&self) -> &str { &self.provider_name }
+    fn name(&self) -> &str {
+        &self.provider_name
+    }
 
-    fn is_available(&self) -> bool { !self.api_key.is_empty() }
+    fn is_available(&self) -> bool {
+        !self.api_key.is_empty()
+    }
 
     fn generate(&self, system_prompt: &str, user_prompt: &str, max_tokens: u32) -> Result<String> {
         self.validate()?;
@@ -123,7 +127,8 @@ impl Provider for OpenAICompatProvider {
             "max_tokens": max_tokens,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -134,10 +139,16 @@ impl Provider for OpenAICompatProvider {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().unwrap_or_default();
-            bail!("{} API error ({}): {}", self.provider_name, status.as_u16(), text);
+            bail!(
+                "{} API error ({}): {}",
+                self.provider_name,
+                status.as_u16(),
+                text
+            );
         }
 
-        let completion: ChatCompletionResponse = resp.json()
+        let completion: ChatCompletionResponse = resp
+            .json()
             .with_context(|| format!("Failed to parse {} response", self.provider_name))?;
 
         if let Some(err) = completion.error {
@@ -186,7 +197,8 @@ impl Provider for OpenAICompatProvider {
             "stream": true,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -197,7 +209,12 @@ impl Provider for OpenAICompatProvider {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().unwrap_or_default();
-            bail!("{} API error ({}): {}", self.provider_name, status.as_u16(), text);
+            bail!(
+                "{} API error ({}): {}",
+                self.provider_name,
+                status.as_u16(),
+                text
+            );
         }
 
         let reader = BufReader::new(resp);
@@ -215,11 +232,15 @@ impl Provider for OpenAICompatProvider {
             };
 
             let line = line.trim().to_string();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
 
             // SSE format: "data: {json}" or "data: [DONE]"
             if let Some(data) = line.strip_prefix("data: ") {
-                if data == "[DONE]" { break; }
+                if data == "[DONE]" {
+                    break;
+                }
 
                 if let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) {
                     if let Some(choices) = chunk.choices {
@@ -256,7 +277,8 @@ impl Provider for OpenAICompatProvider {
             );
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/models", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .timeout(Duration::from_secs(15))
@@ -269,14 +291,22 @@ impl Provider for OpenAICompatProvider {
             bail!("Failed to list models ({}): {}", status, text);
         }
 
-        let models_resp: ModelsResponse = resp.json()
+        let models_resp: ModelsResponse = resp
+            .json()
             .with_context(|| "Failed to parse models response")?;
 
-        Ok(models_resp.data.unwrap_or_default()
+        Ok(models_resp
+            .data
+            .unwrap_or_default()
             .into_iter()
             .map(|m| {
                 let params = estimate_param_billions(&m.id, 0);
-                ModelInfo { name: m.id.clone(), id: m.id, size: 0, param_billions: params }
+                ModelInfo {
+                    name: m.id.clone(),
+                    id: m.id,
+                    size: 0,
+                    param_billions: params,
+                }
             })
             .collect())
     }

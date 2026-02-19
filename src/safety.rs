@@ -34,34 +34,91 @@ impl RiskLevel {
 }
 
 const SAFE_COMMANDS: &[&str] = &[
-    "ls", "ll", "la", "dir",
-    "pwd", "cd",
-    "cat", "less", "more", "head", "tail",
-    "grep", "rg", "ag", "ack",
-    "find", "fd", "locate",
-    "echo", "printf",
-    "date", "cal",
-    "whoami", "id", "who", "w",
-    "uname", "hostname",
-    "env", "printenv",
-    "which", "whereis", "type",
-    "man", "help", "info",
-    "wc", "sort", "uniq", "cut", "tr",
-    "diff", "cmp",
-    "file", "stat",
-    "df", "du",
-    "free", "top", "htop", "ps", "pgrep",
-    "uptime", "lscpu", "lsmem",
-    "ping", "host", "dig", "nslookup",
-    "curl", "wget", "http",
-    "git status", "git log", "git diff", "git branch", "git remote",
-    "docker ps", "docker images", "docker logs",
-    "kubectl get", "kubectl describe", "kubectl logs",
-    "npm list", "npm outdated", "npm view",
-    "pip list", "pip show",
-    "go list", "go version", "go env",
-    "cargo --version", "rustc --version",
-    "node --version", "python --version",
+    "ls",
+    "ll",
+    "la",
+    "dir",
+    "pwd",
+    "cd",
+    "cat",
+    "less",
+    "more",
+    "head",
+    "tail",
+    "grep",
+    "rg",
+    "ag",
+    "ack",
+    "find",
+    "fd",
+    "locate",
+    "echo",
+    "printf",
+    "date",
+    "cal",
+    "whoami",
+    "id",
+    "who",
+    "w",
+    "uname",
+    "hostname",
+    "env",
+    "printenv",
+    "which",
+    "whereis",
+    "type",
+    "man",
+    "help",
+    "info",
+    "wc",
+    "sort",
+    "uniq",
+    "cut",
+    "tr",
+    "diff",
+    "cmp",
+    "file",
+    "stat",
+    "df",
+    "du",
+    "free",
+    "top",
+    "htop",
+    "ps",
+    "pgrep",
+    "uptime",
+    "lscpu",
+    "lsmem",
+    "ping",
+    "host",
+    "dig",
+    "nslookup",
+    "curl",
+    "wget",
+    "http",
+    "git status",
+    "git log",
+    "git diff",
+    "git branch",
+    "git remote",
+    "docker ps",
+    "docker images",
+    "docker logs",
+    "kubectl get",
+    "kubectl describe",
+    "kubectl logs",
+    "npm list",
+    "npm outdated",
+    "npm view",
+    "pip list",
+    "pip show",
+    "go list",
+    "go version",
+    "go env",
+    "cargo --version",
+    "rustc --version",
+    "node --version",
+    "python --version",
 ];
 
 const MODERATE_PATTERNS: &[&str] = &[
@@ -178,8 +235,8 @@ pub fn extract_command(response: &str) -> String {
     }
 
     // Extract from code blocks
-    let code_block_re = Regex::new(r"```(?:bash|sh|shell|zsh|cmd|powershell)?\s*\n([\s\S]*?)\n```")
-        .unwrap();
+    let code_block_re =
+        Regex::new(r"```(?:bash|sh|shell|zsh|cmd|powershell)?\s*\n([\s\S]*?)\n```").unwrap();
     if let Some(caps) = code_block_re.captures(&response) {
         if let Some(m) = caps.get(1) {
             return m.as_str().trim().to_string();
@@ -220,7 +277,10 @@ pub fn extract_command(response: &str) -> String {
 /// Check if a command is blocked
 pub fn is_blocked(command: &str) -> bool {
     let cfg = config::get();
-    cfg.safety.blocked_commands.iter().any(|b| command.contains(b.as_str()))
+    cfg.safety
+        .blocked_commands
+        .iter()
+        .any(|b| command.contains(b.as_str()))
 }
 
 /// Get the first tool/command from a command string
@@ -257,7 +317,10 @@ pub fn get_first_tool(command: &str) -> Option<String> {
 }
 
 fn is_operator(s: &str) -> bool {
-    matches!(s, "|" | "||" | "&&" | ">" | ">>" | "<" | "<<" | "2>" | "2>>" | "&>" | "&>>" | "1>" | "1>>")
+    matches!(
+        s,
+        "|" | "||" | "&&" | ">" | ">>" | "<" | "<<" | "2>" | "2>>" | "&>" | "&>>" | "1>" | "1>>"
+    )
 }
 
 /// Check if a tool exists on the system
@@ -267,9 +330,9 @@ pub fn is_tool_available(tool: &str) -> bool {
     }
 
     const BUILTINS: &[&str] = &[
-        "echo", "cd", "pwd", "export", "source", "alias", "exit", "return",
-        "set", "unset", "read", "eval", "exec", "trap", "wait", "kill",
-        "test", "[", "[[", "if", "for", "while", "case", "function", "time",
+        "echo", "cd", "pwd", "export", "source", "alias", "exit", "return", "set", "unset", "read",
+        "eval", "exec", "trap", "wait", "kill", "test", "[", "[[", "if", "for", "while", "case",
+        "function", "time",
     ];
 
     if BUILTINS.contains(&tool) {

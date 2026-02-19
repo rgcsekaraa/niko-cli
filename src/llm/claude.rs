@@ -1,10 +1,10 @@
 use std::io::{BufRead, BufReader};
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-use crate::llm::{Provider, ModelInfo, estimate_param_billions};
+use crate::llm::{estimate_param_billions, ModelInfo, Provider};
 
 /// Anthropic Claude Messages API provider with SSE streaming
 pub struct ClaudeProvider {
@@ -90,19 +90,27 @@ impl ClaudeProvider {
 
     fn validate(&self) -> Result<()> {
         if self.api_key.is_empty() {
-            bail!("API key not configured for Claude.\nRun 'niko settings configure' to set it up.");
+            bail!(
+                "API key not configured for Claude.\nRun 'niko settings configure' to set it up."
+            );
         }
         if self.model.is_empty() {
-            bail!("No model selected for Claude.\nRun 'niko settings configure' to select a model.");
+            bail!(
+                "No model selected for Claude.\nRun 'niko settings configure' to select a model."
+            );
         }
         Ok(())
     }
 }
 
 impl Provider for ClaudeProvider {
-    fn name(&self) -> &str { "claude" }
+    fn name(&self) -> &str {
+        "claude"
+    }
 
-    fn is_available(&self) -> bool { !self.api_key.is_empty() }
+    fn is_available(&self) -> bool {
+        !self.api_key.is_empty()
+    }
 
     fn generate(&self, system_prompt: &str, user_prompt: &str, max_tokens: u32) -> Result<String> {
         self.validate()?;
@@ -115,7 +123,8 @@ impl Provider for ClaudeProvider {
             "temperature": 0.1,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -131,7 +140,12 @@ impl Provider for ClaudeProvider {
                 if let Some(err) = err_resp.error {
                     let err_type = err.error_type.unwrap_or_default();
                     let msg = err.message.unwrap_or_default();
-                    bail!("Claude API error ({} {}): {}", status.as_u16(), err_type, msg);
+                    bail!(
+                        "Claude API error ({} {}): {}",
+                        status.as_u16(),
+                        err_type,
+                        msg
+                    );
                 }
             }
             bail!("Claude API error ({}): {}", status.as_u16(), text);
@@ -149,9 +163,11 @@ impl Provider for ClaudeProvider {
             eprintln!("  ⚠ Response truncated (hit max_tokens)");
         }
 
-        let content = msg.content
+        let content = msg
+            .content
             .map(|blocks| {
-                blocks.into_iter()
+                blocks
+                    .into_iter()
                     .filter_map(|b| b.text)
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -184,7 +200,8 @@ impl Provider for ClaudeProvider {
             "stream": true,
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -214,7 +231,9 @@ impl Provider for ClaudeProvider {
             };
 
             let line = line.trim().to_string();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
 
             // SSE: "data: {json}"
             if let Some(data) = line.strip_prefix("data: ") {
@@ -258,7 +277,8 @@ impl Provider for ClaudeProvider {
             bail!("API key required to list Claude models.\nRun 'niko settings configure' to set it up.");
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .get("https://api.anthropic.com/v1/models")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -267,26 +287,55 @@ impl Provider for ClaudeProvider {
 
         match resp {
             Ok(r) if r.status().is_success() => {
-                let list: ModelsListResponse = r.json()
-                    .context("Failed to parse Claude models response")?;
+                let list: ModelsListResponse =
+                    r.json().context("Failed to parse Claude models response")?;
 
-                Ok(list.data.unwrap_or_default()
+                Ok(list
+                    .data
+                    .unwrap_or_default()
                     .into_iter()
                     .map(|m| {
-                        let display = if m.display_name.is_empty() { m.id.clone() } else { m.display_name };
+                        let display = if m.display_name.is_empty() {
+                            m.id.clone()
+                        } else {
+                            m.display_name
+                        };
                         let params = estimate_param_billions(&m.id, 0);
-                        ModelInfo { name: display, id: m.id, size: 0, param_billions: params }
+                        ModelInfo {
+                            name: display,
+                            id: m.id,
+                            size: 0,
+                            param_billions: params,
+                        }
                     })
                     .collect())
             }
-            _ => {
-                Ok(vec![
-                    ModelInfo { id: "claude-sonnet-4-20250514".into(), name: "Claude Sonnet 4".into(), size: 0, param_billions: 0.0 },
-                    ModelInfo { id: "claude-3-5-haiku-20241022".into(), name: "Claude 3.5 Haiku".into(), size: 0, param_billions: 0.0 },
-                    ModelInfo { id: "claude-3-5-sonnet-20241022".into(), name: "Claude 3.5 Sonnet".into(), size: 0, param_billions: 0.0 },
-                    ModelInfo { id: "claude-3-opus-20240229".into(), name: "Claude 3 Opus".into(), size: 0, param_billions: 0.0 },
-                ])
-            }
+            _ => Ok(vec![
+                ModelInfo {
+                    id: "claude-sonnet-4-20250514".into(),
+                    name: "Claude Sonnet 4".into(),
+                    size: 0,
+                    param_billions: 0.0,
+                },
+                ModelInfo {
+                    id: "claude-3-5-haiku-20241022".into(),
+                    name: "Claude 3.5 Haiku".into(),
+                    size: 0,
+                    param_billions: 0.0,
+                },
+                ModelInfo {
+                    id: "claude-3-5-sonnet-20241022".into(),
+                    name: "Claude 3.5 Sonnet".into(),
+                    size: 0,
+                    param_billions: 0.0,
+                },
+                ModelInfo {
+                    id: "claude-3-opus-20240229".into(),
+                    name: "Claude 3 Opus".into(),
+                    size: 0,
+                    param_billions: 0.0,
+                },
+            ]),
         }
     }
 }

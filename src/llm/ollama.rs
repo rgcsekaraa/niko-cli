@@ -2,10 +2,10 @@ use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-use crate::llm::{Provider, ModelInfo, estimate_param_billions};
+use crate::llm::{estimate_param_billions, ModelInfo, Provider};
 
 pub struct OllamaProvider {
     base_url: String,
@@ -84,15 +84,20 @@ impl OllamaProvider {
     }
 
     fn has_model(&self, model: &str) -> bool {
-        if model.is_empty() { return false; }
+        if model.is_empty() {
+            return false;
+        }
         match self.fetch_local_models() {
-            Ok(models) => models.iter().any(|m| m.id == model || m.id.starts_with(model)),
+            Ok(models) => models
+                .iter()
+                .any(|m| m.id == model || m.id.starts_with(model)),
             Err(_) => false,
         }
     }
 
     fn fetch_local_models(&self) -> Result<Vec<ModelInfo>> {
-        let resp = self.client
+        let resp = self
+            .client
             .get(format!("{}/api/tags", self.base_url))
             .timeout(Duration::from_secs(5))
             .send()
@@ -104,22 +109,28 @@ impl OllamaProvider {
 
         let tags: TagsResponse = resp.json().context("Failed to parse Ollama response")?;
 
-        Ok(tags.models.unwrap_or_default().into_iter().map(|m| {
-            let param_b = estimate_param_billions(&m.name, m.size);
-            ModelInfo {
-                id: m.name.clone(),
-                name: m.name,
-                size: m.size,
-                param_billions: param_b,
-            }
-        }).collect())
+        Ok(tags
+            .models
+            .unwrap_or_default()
+            .into_iter()
+            .map(|m| {
+                let param_b = estimate_param_billions(&m.name, m.size);
+                ModelInfo {
+                    id: m.name.clone(),
+                    name: m.name,
+                    size: m.size,
+                    param_billions: param_b,
+                }
+            })
+            .collect())
     }
 
     pub fn pull_model(&self, model: &str) -> Result<()> {
         eprintln!("  Downloading '{}'...", model);
 
         let body = serde_json::json!({ "name": model, "stream": true });
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/api/pull", self.base_url))
             .json(&body)
             .timeout(Duration::from_secs(7200))
@@ -136,8 +147,13 @@ impl OllamaProvider {
         let mut last_status = String::new();
 
         for line in reader.lines() {
-            let line = match line { Ok(l) => l, Err(_) => continue };
-            if line.trim().is_empty() { continue; }
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => continue,
+            };
+            if line.trim().is_empty() {
+                continue;
+            }
             if let Ok(p) = serde_json::from_str::<PullProgress>(&line) {
                 let status = p.status.unwrap_or_default();
                 if let (Some(done), Some(total)) = (p.completed, p.total) {
@@ -172,7 +188,13 @@ impl OllamaProvider {
     }
 
     /// Build the request body with performance optimizations
-    fn build_request_body(&self, system_prompt: &str, user_prompt: &str, max_tokens: u32, stream: bool) -> serde_json::Value {
+    fn build_request_body(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        max_tokens: u32,
+        stream: bool,
+    ) -> serde_json::Value {
         // Adaptive context window based on input size
         let total_chars = system_prompt.len() + user_prompt.len();
         let num_ctx = if total_chars > 50_000 {
@@ -205,7 +227,9 @@ impl OllamaProvider {
 }
 
 impl Provider for OllamaProvider {
-    fn name(&self) -> &str { "ollama" }
+    fn name(&self) -> &str {
+        "ollama"
+    }
 
     fn is_available(&self) -> bool {
         self.is_server_running()
@@ -229,7 +253,8 @@ impl Provider for OllamaProvider {
             }
         })?;
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/api/chat", self.base_url))
             .json(&body)
             .send()
@@ -282,7 +307,8 @@ impl Provider for OllamaProvider {
 
         let body = self.build_request_body(system_prompt, user_prompt, max_tokens, true);
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/api/chat", self.base_url))
             .json(&body)
             .send()
@@ -317,7 +343,9 @@ impl Provider for OllamaProvider {
                 }
             };
 
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
 
             match serde_json::from_str::<StreamChunk>(&line) {
                 Ok(chunk) => {
@@ -327,7 +355,9 @@ impl Provider for OllamaProvider {
                             accumulated.push_str(&msg.content);
                         }
                     }
-                    if chunk.done { break; }
+                    if chunk.done {
+                        break;
+                    }
                 }
                 Err(_) => continue, // Skip malformed lines
             }
@@ -366,7 +396,8 @@ pub fn is_ollama_running() -> bool {
         .ok()
         .and_then(|c| {
             c.get("http://127.0.0.1:11434/api/tags")
-                .send().ok()
+                .send()
+                .ok()
                 .map(|r| r.status().is_success())
         })
         .unwrap_or(false)
@@ -381,7 +412,9 @@ pub fn install_ollama() -> Result<()> {
             .status()
             .context("Failed to run Ollama installer")?;
         if !status.success() {
-            bail!("Ollama installation failed.\nInstall manually from: https://ollama.com/download");
+            bail!(
+                "Ollama installation failed.\nInstall manually from: https://ollama.com/download"
+            );
         }
     } else if cfg!(target_os = "windows") {
         let status = Command::new("powershell")
@@ -391,7 +424,9 @@ pub fn install_ollama() -> Result<()> {
             .status()
             .context("Failed to download Ollama installer")?;
         if !status.success() {
-            bail!("Ollama installation failed.\nDownload manually from: https://ollama.com/download");
+            bail!(
+                "Ollama installation failed.\nDownload manually from: https://ollama.com/download"
+            );
         }
     } else {
         bail!("Unsupported OS. Install Ollama manually from: https://ollama.com/download");
@@ -402,30 +437,50 @@ pub fn install_ollama() -> Result<()> {
 
 pub fn search_ollama_models(query: &str) -> Result<Vec<ModelInfo>> {
     let known_models = vec![
-        ("qwen2.5-coder:0.5b", 0.5), ("qwen2.5-coder:1.5b", 1.5),
-        ("qwen2.5-coder:3b", 3.0), ("qwen2.5-coder:7b", 7.0),
-        ("qwen2.5-coder:14b", 14.0), ("qwen2.5-coder:32b", 32.0),
+        ("qwen2.5-coder:0.5b", 0.5),
+        ("qwen2.5-coder:1.5b", 1.5),
+        ("qwen2.5-coder:3b", 3.0),
+        ("qwen2.5-coder:7b", 7.0),
+        ("qwen2.5-coder:14b", 14.0),
+        ("qwen2.5-coder:32b", 32.0),
         ("deepseek-coder-v2:16b", 16.0),
-        ("codellama:7b", 7.0), ("codellama:13b", 13.0), ("codellama:34b", 34.0),
-        ("starcoder2:3b", 3.0), ("starcoder2:7b", 7.0), ("starcoder2:15b", 15.0),
-        ("llama3.2:1b", 1.0), ("llama3.2:3b", 3.0),
-        ("llama3.1:8b", 8.0), ("llama3.1:70b", 70.0),
-        ("gemma2:2b", 2.0), ("gemma2:9b", 9.0), ("gemma2:27b", 27.0),
-        ("mistral:7b", 7.0), ("mixtral:8x7b", 47.0),
-        ("phi3:3.8b", 3.8), ("phi3:14b", 14.0),
-        ("deepseek-r1:1.5b", 1.5), ("deepseek-r1:7b", 7.0), ("deepseek-r1:8b", 8.0),
-        ("deepseek-r1:14b", 14.0), ("deepseek-r1:32b", 32.0), ("deepseek-r1:70b", 70.0),
+        ("codellama:7b", 7.0),
+        ("codellama:13b", 13.0),
+        ("codellama:34b", 34.0),
+        ("starcoder2:3b", 3.0),
+        ("starcoder2:7b", 7.0),
+        ("starcoder2:15b", 15.0),
+        ("llama3.2:1b", 1.0),
+        ("llama3.2:3b", 3.0),
+        ("llama3.1:8b", 8.0),
+        ("llama3.1:70b", 70.0),
+        ("gemma2:2b", 2.0),
+        ("gemma2:9b", 9.0),
+        ("gemma2:27b", 27.0),
+        ("mistral:7b", 7.0),
+        ("mixtral:8x7b", 47.0),
+        ("phi3:3.8b", 3.8),
+        ("phi3:14b", 14.0),
+        ("deepseek-r1:1.5b", 1.5),
+        ("deepseek-r1:7b", 7.0),
+        ("deepseek-r1:8b", 8.0),
+        ("deepseek-r1:14b", 14.0),
+        ("deepseek-r1:32b", 32.0),
+        ("deepseek-r1:70b", 70.0),
     ];
 
     let query_lower = query.to_lowercase();
     let max_params = crate::config::max_model_size_for_ram() as f64;
 
-    Ok(known_models.into_iter()
+    Ok(known_models
+        .into_iter()
         .filter(|(name, _)| query.is_empty() || name.contains(&query_lower))
         .filter(|(_, params)| *params <= max_params)
         .map(|(name, params)| ModelInfo {
-            id: name.to_string(), name: name.to_string(),
-            size: 0, param_billions: params,
+            id: name.to_string(),
+            name: name.to_string(),
+            size: 0,
+            param_billions: params,
         })
         .collect())
 }

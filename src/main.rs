@@ -1,10 +1,10 @@
+mod chunker;
 mod config;
 mod llm;
-mod chunker;
+mod modes;
 mod prompt;
 mod safety;
 mod ui;
-mod modes;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -87,10 +87,7 @@ enum SettingsAction {
     /// Interactive provider setup wizard
     Configure,
     /// Set a specific config value (e.g. `niko settings set openai.model gpt-4o`)
-    Set {
-        key: String,
-        value: String,
-    },
+    Set { key: String, value: String },
     /// Re-initialise config to defaults
     Init,
     /// Print the config file path
@@ -101,13 +98,21 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Some(Commands::Cmd { query, provider, verbose }) => {
+        Some(Commands::Cmd {
+            query,
+            provider,
+            verbose,
+        }) => {
             let provider_ref = provider.as_deref().or(cli.provider.as_deref());
             let query_str = query.join(" ");
             modes::cmd::run(&query_str, provider_ref, verbose || cli.verbose)
         }
 
-        Some(Commands::Explain { file, provider, verbose }) => {
+        Some(Commands::Explain {
+            file,
+            provider,
+            verbose,
+        }) => {
             let provider_ref = provider.as_deref().or(cli.provider.as_deref());
             modes::explain::run(file.as_deref(), provider_ref, verbose || cli.verbose)
         }

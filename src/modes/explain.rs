@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use colored::*;
 
 use crate::{chunker, llm, ui};
@@ -14,13 +14,15 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         let line_count = content.lines().count();
         eprintln!();
         ui::box_top(&format!("{}", format!("File: {}", path).dimmed()));
-        ui::box_line(&format!("{}", format!("{} lines loaded", line_count).cyan()));
+        ui::box_line(&format!(
+            "{}",
+            format!("{} lines loaded", line_count).cyan()
+        ));
         ui::box_bottom();
 
         content
     } else {
-        ui::read_stdin_input()
-            .map_err(|e| anyhow::anyhow!("Failed to read input: {}", e))?
+        ui::read_stdin_input().map_err(|e| anyhow::anyhow!("Failed to read input: {}", e))?
     };
 
     let code = code.trim().to_string();
@@ -67,7 +69,10 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
 
     match result {
         Ok(explanation) => {
-            ui::print_dim(&format!("  Completed in {:.1}s", explanation.elapsed.as_secs_f64()));
+            ui::print_dim(&format!(
+                "  Completed in {:.1}s",
+                explanation.elapsed.as_secs_f64()
+            ));
             ui::display_explanation(&explanation);
         }
         Err(e) => {

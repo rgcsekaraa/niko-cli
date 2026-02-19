@@ -24,7 +24,12 @@ const BOX_WIDTH: usize = 62;
 /// Draw a top border with an optional title
 pub fn box_top(title: &str) {
     if title.is_empty() {
-        eprintln!("{}{}{}", BOX_TL.dimmed(), BOX_H.repeat(BOX_WIDTH).dimmed(), BOX_TR.dimmed());
+        eprintln!(
+            "{}{}{}",
+            BOX_TL.dimmed(),
+            BOX_H.repeat(BOX_WIDTH).dimmed(),
+            BOX_TR.dimmed()
+        );
     } else {
         let title_display = format!(" {} ", title);
         let title_plain_len = strip_ansi_len(&title_display);
@@ -46,17 +51,32 @@ pub fn box_top(title: &str) {
 
 /// Draw a bottom border
 pub fn box_bottom() {
-    eprintln!("{}{}{}", BOX_BL.dimmed(), BOX_H.repeat(BOX_WIDTH).dimmed(), BOX_BR.dimmed());
+    eprintln!(
+        "{}{}{}",
+        BOX_BL.dimmed(),
+        BOX_H.repeat(BOX_WIDTH).dimmed(),
+        BOX_BR.dimmed()
+    );
 }
 
 /// Draw a separator line
 pub fn box_sep() {
-    eprintln!("{}{}{}", BOX_SEP_L.dimmed(), BOX_H.repeat(BOX_WIDTH).dimmed(), BOX_SEP_R.dimmed());
+    eprintln!(
+        "{}{}{}",
+        BOX_SEP_L.dimmed(),
+        BOX_H.repeat(BOX_WIDTH).dimmed(),
+        BOX_SEP_R.dimmed()
+    );
 }
 
 /// Draw an empty line inside a box
 pub fn box_empty() {
-    eprintln!("{}{}{}", BOX_V.dimmed(), " ".repeat(BOX_WIDTH), BOX_V.dimmed());
+    eprintln!(
+        "{}{}{}",
+        BOX_V.dimmed(),
+        " ".repeat(BOX_WIDTH),
+        BOX_V.dimmed()
+    );
 }
 
 /// Draw a line inside a box with content (left-aligned with 2-char indent)
@@ -67,7 +87,13 @@ pub fn box_line(content: &str) {
     } else {
         0
     };
-    eprintln!("{} {}{}{}", BOX_V.dimmed(), content, " ".repeat(padding), BOX_V.dimmed());
+    eprintln!(
+        "{} {}{}{}",
+        BOX_V.dimmed(),
+        content,
+        " ".repeat(padding),
+        BOX_V.dimmed()
+    );
 }
 
 /// Draw a key-value line inside a box
@@ -219,7 +245,11 @@ pub fn read_stdin_input() -> io::Result<String> {
     // Interactive mode — live line counter
     eprintln!();
     box_top(&"Paste Code".bold().to_string());
-    box_line(&"Paste your code below. Press Ctrl-D or two empty lines to finish.".dimmed().to_string());
+    box_line(
+        &"Paste your code below. Press Ctrl-D or two empty lines to finish."
+            .dimmed()
+            .to_string(),
+    );
     box_sep();
 
     let mut lines = Vec::new();
@@ -256,7 +286,10 @@ pub fn read_stdin_input() -> io::Result<String> {
         lines.pop();
     }
 
-    box_line(&format!("{}", format!("[{} lines pasted]", lines.len()).green().bold()));
+    box_line(&format!(
+        "{}",
+        format!("[{} lines pasted]", lines.len()).green().bold()
+    ));
     box_bottom();
     eprintln!();
 
@@ -301,13 +334,11 @@ pub fn show_code_preview(code: &str) -> bool {
 
     // Collapsed section
     let hidden = count - 8; // 5 top + 3 bottom
-    box_line(
-        &format!(
-            "   {} {}",
-            format!("⋯ {} lines hidden", hidden).dimmed(),
-            "(press Enter to expand, or any key + Enter to continue)".dimmed()
-        )
-    );
+    box_line(&format!(
+        "   {} {}",
+        format!("⋯ {} lines hidden", hidden).dimmed(),
+        "(press Enter to expand, or any key + Enter to continue)".dimmed()
+    ));
 
     // Last 3 lines
     for line in lines.iter().skip(count - 3) {
@@ -322,7 +353,10 @@ pub fn show_code_preview(code: &str) -> bool {
     box_bottom();
 
     // Prompt for expansion
-    eprint!("{}", "  Press Enter to expand, or any key to continue: ".dimmed());
+    eprint!(
+        "{}",
+        "  Press Enter to expand, or any key to continue: ".dimmed()
+    );
     let _ = io::stderr().flush();
 
     let mut input = String::new();
@@ -330,7 +364,10 @@ pub fn show_code_preview(code: &str) -> bool {
         if input.trim().is_empty() {
             // Expand — show all lines
             eprintln!();
-            box_top(&format!("{}", format!("Code ({} lines) — expanded", count).dimmed()));
+            box_top(&format!(
+                "{}",
+                format!("Code ({} lines) — expanded", count).dimmed()
+            ));
             for (i, line) in lines.iter().enumerate() {
                 let line_num = format!("{:>4}", i + 1).dimmed();
                 let truncated = if line.len() > BOX_WIDTH - 8 {
@@ -361,7 +398,10 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
         "{} lines analyzed{}",
         result.total_lines.to_string().cyan(),
         if result.total_chunks > 1 {
-            format!("  •  {} chunks processed", result.total_chunks.to_string().cyan())
+            format!(
+                "  •  {} chunks processed",
+                result.total_chunks.to_string().cyan()
+            )
         } else {
             String::new()
         }
@@ -411,11 +451,7 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
     if !result.follow_up_questions.is_empty() {
         box_top(&format!("{}", "Follow-up Questions".dimmed()));
         for (i, q) in result.follow_up_questions.iter().enumerate() {
-            box_line(&format!(
-                "{}  {}",
-                format!("{}.", i + 1).cyan(),
-                q
-            ));
+            box_line(&format!("{}  {}", format!("{}.", i + 1).cyan(), q));
         }
         box_bottom();
         eprintln!();
@@ -446,7 +482,10 @@ pub fn prompt_input(prompt: &str) -> io::Result<String> {
     io::stderr().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
-    Ok(input.trim_end_matches('\n').trim_end_matches('\r').to_string())
+    Ok(input
+        .trim_end_matches('\n')
+        .trim_end_matches('\r')
+        .to_string())
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

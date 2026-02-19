@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use colored::*;
 
 use crate::{llm, prompt, safety, ui};
@@ -21,7 +21,11 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
     }
 
     if verbose {
-        eprintln!("{} provider: {}", "debug".dimmed(), provider.name().dimmed());
+        eprintln!(
+            "{} provider: {}",
+            "debug".dimmed(),
+            provider.name().dimmed()
+        );
     }
 
     let ctx = prompt::gather_context();
@@ -38,7 +42,8 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
 
     let start = std::time::Instant::now();
     // Non-streaming with retry — we need the full command for safety checks
-    let response = llm::generate_with_retry(provider.as_ref(), &system_prompt, query, CMD_MAX_TOKENS);
+    let response =
+        llm::generate_with_retry(provider.as_ref(), &system_prompt, query, CMD_MAX_TOKENS);
     spinner.stop();
 
     let elapsed = start.elapsed();

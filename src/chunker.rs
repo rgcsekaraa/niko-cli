@@ -48,11 +48,14 @@ pub fn chunk_code(code: &str) -> Vec<CodeChunk> {
     let lines: Vec<&str> = code.lines().collect();
     let total = lines.len();
 
-    if total == 0 { return vec![]; }
+    if total == 0 {
+        return vec![];
+    }
 
     if total <= MAX_CHUNK_LINES {
         return vec![CodeChunk {
-            start_line: 1, end_line: total,
+            start_line: 1,
+            end_line: total,
             content: code.to_string(),
             context_prefix: String::new(),
         }];
@@ -70,19 +73,32 @@ pub fn chunk_code(code: &str) -> Vec<CodeChunk> {
 
             for i in (search_start..end).rev() {
                 let line = lines[i].trim();
-                if line.is_empty() { best_break = i + 1; break; }
-                if line == "}" || line == "};" || line == "end" {
-                    best_break = i + 1; break;
+                if line.is_empty() {
+                    best_break = i + 1;
+                    break;
                 }
-                if is_definition_start(line) { best_break = i; break; }
+                if line == "}" || line == "};" || line == "end" {
+                    best_break = i + 1;
+                    break;
+                }
+                if is_definition_start(line) {
+                    best_break = i;
+                    break;
+                }
             }
             end = best_break;
         }
 
-        if end <= start { end = (start + MAX_CHUNK_LINES).min(total); }
+        if end <= start {
+            end = (start + MAX_CHUNK_LINES).min(total);
+        }
 
         let context_prefix = if !chunks.is_empty() {
-            let ctx_start = if start >= CONTEXT_OVERLAP_LINES { start - CONTEXT_OVERLAP_LINES } else { 0 };
+            let ctx_start = if start >= CONTEXT_OVERLAP_LINES {
+                start - CONTEXT_OVERLAP_LINES
+            } else {
+                0
+            };
             let ctx_lines = &lines[ctx_start..start];
             format!(
                 "// [context: preceding lines {}-{} shown for continuity]\n{}\n// [chunk starts here]\n",
@@ -93,7 +109,8 @@ pub fn chunk_code(code: &str) -> Vec<CodeChunk> {
         };
 
         chunks.push(CodeChunk {
-            start_line: start + 1, end_line: end,
+            start_line: start + 1,
+            end_line: end,
             content: lines[start..end].join("\n"),
             context_prefix,
         });
@@ -105,13 +122,31 @@ pub fn chunk_code(code: &str) -> Vec<CodeChunk> {
 
 fn is_definition_start(line: &str) -> bool {
     let prefixes = [
-        "fn ", "pub fn ", "pub(crate) fn ", "pub(super) fn ",
-        "async fn ", "pub async fn ",
-        "def ", "class ", "function ", "func ",
-        "const ", "let ", "var ", "static ",
-        "type ", "struct ", "impl ", "trait ",
-        "interface ", "package ", "module ",
-        "export ", "import ", "#[", "@",
+        "fn ",
+        "pub fn ",
+        "pub(crate) fn ",
+        "pub(super) fn ",
+        "async fn ",
+        "pub async fn ",
+        "def ",
+        "class ",
+        "function ",
+        "func ",
+        "const ",
+        "let ",
+        "var ",
+        "static ",
+        "type ",
+        "struct ",
+        "impl ",
+        "trait ",
+        "interface ",
+        "package ",
+        "module ",
+        "export ",
+        "import ",
+        "#[",
+        "@",
     ];
     prefixes.iter().any(|p| line.starts_with(p))
 }
@@ -145,7 +180,10 @@ pub fn explain_code(
         if total_chunks > 1 {
             eprintln!(
                 "  Chunk {}/{} (lines {}–{})…",
-                i + 1, total_chunks, chunk.start_line, chunk.end_line
+                i + 1,
+                total_chunks,
+                chunk.start_line,
+                chunk.end_line
             );
         }
 
@@ -154,7 +192,8 @@ pub fn explain_code(
         let user_prompt = if chunk.context_prefix.is_empty() {
             format!(
                 "Lines {}-{} ({} lines):\n\n```\n{}\n```",
-                chunk.start_line, chunk.end_line,
+                chunk.start_line,
+                chunk.end_line,
                 chunk.end_line - chunk.start_line + 1,
                 chunk.content
             )
@@ -162,7 +201,8 @@ pub fn explain_code(
             format!(
                 "{}\nLines {}-{} ({} lines):\n\n```\n{}\n```",
                 chunk.context_prefix,
-                chunk.start_line, chunk.end_line,
+                chunk.start_line,
+                chunk.end_line,
                 chunk.end_line - chunk.start_line + 1,
                 chunk.content
             )
@@ -176,7 +216,9 @@ pub fn explain_code(
                 &system_prompt,
                 &user_prompt,
                 CHUNK_MAX_TOKENS,
-                &mut |token| { eprint!("{}", token); },
+                &mut |token| {
+                    eprint!("{}", token);
+                },
             );
             eprintln!("\n");
             result?
@@ -193,7 +235,9 @@ pub fn explain_code(
 
     // Synthesis — always non-streaming with retry (needs full response for parsing)
     let (summary, questions) = if total_chunks > 1 {
-        if stream { eprintln!("  Synthesizing…"); }
+        if stream {
+            eprintln!("  Synthesizing…");
+        }
         generate_summary_and_questions(provider, &chunk_explanations, total_lines)?
     } else {
         let explanation = &chunk_explanations[0].explanation;
@@ -202,7 +246,9 @@ pub fn explain_code(
     };
 
     Ok(ExplainResult {
-        total_lines, total_chunks, chunk_explanations,
+        total_lines,
+        total_chunks,
+        chunk_explanations,
         overall_summary: summary,
         follow_up_questions: questions,
         elapsed: start_time.elapsed(),
@@ -284,8 +330,14 @@ fn generate_summary_and_questions(
     explanations: &[ChunkExplanation],
     total_lines: usize,
 ) -> Result<(String, Vec<String>)> {
-    let combined = explanations.iter()
-        .map(|e| format!("### Lines {}-{}\n{}", e.start_line, e.end_line, e.explanation))
+    let combined = explanations
+        .iter()
+        .map(|e| {
+            format!(
+                "### Lines {}-{}\n{}",
+                e.start_line, e.end_line, e.explanation
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n\n---\n\n");
 
@@ -315,10 +367,13 @@ Do NOT just summarize each chunk sequentially — synthesize across chunks to sh
 
     let user_prompt = format!(
         "The codebase has {} total lines across {} chunks:\n\n{}",
-        total_lines, explanations.len(), combined
+        total_lines,
+        explanations.len(),
+        combined
     );
 
-    let response = llm::generate_with_retry(provider, system_prompt, &user_prompt, SYNTHESIS_MAX_TOKENS)?;
+    let response =
+        llm::generate_with_retry(provider, system_prompt, &user_prompt, SYNTHESIS_MAX_TOKENS)?;
     let (summary, questions) = parse_summary_response(&response);
     Ok((summary, questions))
 }
@@ -334,20 +389,28 @@ fn generate_follow_up_only(provider: &dyn Provider, explanation: &str) -> Result
 
 Make each question specific to the actual code (reference real function/type names). Do NOT ask generic questions."#;
 
-    let response = llm::generate_with_retry(provider, system_prompt, explanation, FOLLOWUP_MAX_TOKENS)?;
+    let response =
+        llm::generate_with_retry(provider, system_prompt, explanation, FOLLOWUP_MAX_TOKENS)?;
 
-    Ok(response.lines()
+    Ok(response
+        .lines()
         .filter(|line| {
             let t = line.trim();
-            !t.is_empty() && t.len() > 3
-                && (t.starts_with("1.") || t.starts_with("2.") || t.starts_with("3.")
-                    || t.starts_with("4.") || t.starts_with("5."))
+            !t.is_empty()
+                && t.len() > 3
+                && (t.starts_with("1.")
+                    || t.starts_with("2.")
+                    || t.starts_with("3.")
+                    || t.starts_with("4.")
+                    || t.starts_with("5."))
         })
         .map(|line| {
             let t = line.trim();
             if let Some(rest) = t.strip_prefix(|c: char| c.is_ascii_digit()) {
                 rest.trim_start_matches('.').trim().to_string()
-            } else { t.to_string() }
+            } else {
+                t.to_string()
+            }
         })
         .take(5)
         .collect())
@@ -362,27 +425,51 @@ fn parse_summary_response(response: &str) -> (String, Vec<String>) {
     for line in response.lines() {
         let trimmed = line.trim();
 
-        if trimmed.starts_with("## Summary") || trimmed.starts_with("**Summary**") || trimmed.starts_with("# Summary") {
-            in_summary = true; in_questions = false; continue;
+        if trimmed.starts_with("## Summary")
+            || trimmed.starts_with("**Summary**")
+            || trimmed.starts_with("# Summary")
+        {
+            in_summary = true;
+            in_questions = false;
+            continue;
         }
-        if trimmed.starts_with("## Follow-up") || trimmed.starts_with("**Follow-up") || trimmed.starts_with("# Follow-up") || trimmed.starts_with("## Questions") {
-            in_summary = false; in_questions = true; continue;
+        if trimmed.starts_with("## Follow-up")
+            || trimmed.starts_with("**Follow-up")
+            || trimmed.starts_with("# Follow-up")
+            || trimmed.starts_with("## Questions")
+        {
+            in_summary = false;
+            in_questions = true;
+            continue;
         }
 
-        if in_summary { summary.push_str(line); summary.push('\n'); }
+        if in_summary {
+            summary.push_str(line);
+            summary.push('\n');
+        }
 
         if in_questions && questions.len() < 5 {
             let t = trimmed.to_string();
-            if !t.is_empty() && (t.starts_with("1.") || t.starts_with("2.") || t.starts_with("3.") || t.starts_with("4.") || t.starts_with("5.")) {
+            if !t.is_empty()
+                && (t.starts_with("1.")
+                    || t.starts_with("2.")
+                    || t.starts_with("3.")
+                    || t.starts_with("4.")
+                    || t.starts_with("5."))
+            {
                 if let Some(rest) = t.strip_prefix(|c: char| c.is_ascii_digit()) {
                     let q = rest.trim_start_matches('.').trim().to_string();
-                    if !q.is_empty() { questions.push(q); }
+                    if !q.is_empty() {
+                        questions.push(q);
+                    }
                 }
             }
         }
     }
 
-    if summary.trim().is_empty() { summary = response.to_string(); }
+    if summary.trim().is_empty() {
+        summary = response.to_string();
+    }
     (summary.trim().to_string(), questions)
 }
 
@@ -403,7 +490,9 @@ mod tests {
     #[test]
     fn test_chunk_large_code() {
         let mut code = String::new();
-        for i in 0..500 { code.push_str(&format!("let x{} = {};\n", i, i)); }
+        for i in 0..500 {
+            code.push_str(&format!("let x{} = {};\n", i, i));
+        }
         let chunks = chunk_code(&code);
         assert!(chunks.len() > 1);
         for i in 1..chunks.len() {
