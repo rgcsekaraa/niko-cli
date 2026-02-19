@@ -35,8 +35,10 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
     spinner.start();
 
     let start = std::time::Instant::now();
-    let response = provider.generate(&system_prompt, query);
+    let response = llm::generate_with_retry(provider.as_ref(), &system_prompt, query);
     spinner.stop();
+
+    let elapsed = start.elapsed();
 
     let response = match response {
         Ok(r) => r,
@@ -48,7 +50,7 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
     };
 
     if verbose {
-        ui::print_dim(&format!("  response time: {:?}", start.elapsed()));
+        ui::print_dim(&format!("  response time: {:?}", elapsed));
     }
 
     let command = safety::extract_command(&response);

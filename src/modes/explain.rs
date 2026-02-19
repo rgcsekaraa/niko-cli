@@ -39,8 +39,10 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         );
     }
 
-    // Show collapsible code preview
-    ui::show_code_preview(&code);
+    // Show collapsible code preview for interactive input
+    if file_path.is_none() {
+        ui::show_code_preview(&code);
+    }
 
     let line_count = code.lines().count();
     eprintln!();
@@ -63,7 +65,7 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
         ui::print_dim(&format!("  provider: {}", provider.name()));
     }
 
-    // Process with chunking engine
+    // Process with chunking engine (includes retry + context memory)
     let mut spinner = ui::Spinner::new("Analyzing code...");
     spinner.start();
 
@@ -72,6 +74,8 @@ pub fn run(file_path: Option<&str>, provider_override: Option<&str>, verbose: bo
 
     match result {
         Ok(explanation) => {
+            // Show timing
+            ui::print_dim(&format!("  Completed in {:.1}s", explanation.elapsed.as_secs_f64()));
             ui::display_explanation(&explanation);
         }
         Err(e) => {
