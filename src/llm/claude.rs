@@ -15,11 +15,27 @@ pub struct ClaudeProvider {
 #[derive(Deserialize)]
 struct MessagesResponse {
     content: Option<Vec<ContentBlock>>,
+    #[serde(default)]
+    stop_reason: Option<String>,
+    #[serde(default)]
+    error: Option<ApiError>,
 }
 
 #[derive(Deserialize)]
 struct ContentBlock {
     text: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct ApiError {
+    message: Option<String>,
+    #[serde(rename = "type", default)]
+    error_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ErrorResponse {
+    error: Option<ApiError>,
 }
 
 #[derive(Deserialize)]
@@ -36,8 +52,13 @@ struct ClaudeModel {
 
 impl ClaudeProvider {
     pub fn new(api_key: &str, model: &str) -> Self {
+        // Connection pool with keep-alive
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(10))
+            .pool_max_idle_per_host(4)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
 
@@ -90,19 +111,50 @@ impl Provider for ClaudeProvider {
             .send()
             .context("Failed to call Claude API")?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
+        let status = resp.status();
+        if !status.is_success() {
             let text = resp.text().unwrap_or_default();
-            bail!("Claude API error ({}): {}", status, text);
+            // Try parsing structured error
+            if let Ok(err_resp) = serde_json::from_str::<ErrorResponse>(&text) {
+                if let Some(err) = err_resp.error {
+                    let err_type = err.error_type.unwrap_or_default();
+                    let msg = err.message.unwrap_or_default();
+                    bail!("Claude API error ({} {}): {}", status.as_u16(), err_type, msg);
+                }
+            }
+            bail!("Claude API error ({}): {}", status.as_u16(), text);
         }
 
         let msg: MessagesResponse = resp.json().context("Failed to parse Claude response")?;
 
+        // Check embedded errors
+        if let Some(err) = msg.error {
+            if let Some(emsg) = err.message {
+                bail!("Claude API error: {}", emsg);
+            }
+        }
+
+        // Warn if truncated
+        if msg.stop_reason.as_deref() == Some("max_tokens") {
+            eprintln!("  {} Response was truncated (hit max_tokens)", "⚠".to_string());
+        }
+
         let content = msg.content
-            .and_then(|blocks| blocks.into_iter().filter_map(|b| b.text).next())
+            .and_then(|blocks| {
+                blocks.into_iter()
+                    .filter_map(|b| b.text)
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    .into()
+            })
             .unwrap_or_default();
 
-        Ok(content.trim().to_string())
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            bail!("Claude returned empty response content");
+        }
+
+        Ok(trimmed.to_string())
     }
 
     fn list_models(&self) -> Result<Vec<ModelInfo>> {
@@ -146,8 +198,7 @@ impl Provider for ClaudeProvider {
                 Ok(models)
             }
             _ => {
-                // Fallback: the models endpoint may not be available for all accounts
-                // Return known Claude models
+                // Fallback to known Claude models
                 Ok(vec![
                     ModelInfo { id: "claude-sonnet-4-20250514".into(), name: "Claude Sonnet 4".into(), size: 0, param_billions: 0.0 },
                     ModelInfo { id: "claude-3-5-haiku-20241022".into(), name: "Claude 3.5 Haiku".into(), size: 0, param_billions: 0.0 },

@@ -17,16 +17,25 @@ pub struct OpenAICompatProvider {
 #[derive(Deserialize)]
 struct ChatCompletionResponse {
     choices: Option<Vec<Choice>>,
+    #[serde(default)]
+    error: Option<ApiError>,
 }
 
 #[derive(Deserialize)]
 struct Choice {
     message: ChoiceMessage,
+    #[serde(default)]
+    finish_reason: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct ChoiceMessage {
-    content: String,
+    content: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct ApiError {
+    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -41,8 +50,13 @@ struct ApiModel {
 
 impl OpenAICompatProvider {
     pub fn new(provider_name: &str, api_key: &str, base_url: &str, model: &str) -> Self {
+        // Connection pool with keep-alive for fast sequential requests
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(10))
+            .pool_max_idle_per_host(4)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .unwrap_or_else(|_| reqwest::blocking::Client::new());
 
@@ -100,21 +114,43 @@ impl Provider for OpenAICompatProvider {
             .send()
             .with_context(|| format!("Failed to call {} API", self.provider_name))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
+        let status = resp.status();
+        if !status.is_success() {
             let text = resp.text().unwrap_or_default();
-            bail!("{} API error ({}): {}", self.provider_name, status, text);
+            // Include status code for retry detection
+            bail!("{} API error ({}): {}", self.provider_name, status.as_u16(), text);
         }
 
         let completion: ChatCompletionResponse = resp.json()
             .with_context(|| format!("Failed to parse {} response", self.provider_name))?;
 
-        let content = completion.choices
-            .and_then(|c| c.into_iter().next())
-            .map(|c| c.message.content)
-            .unwrap_or_default();
+        // Check for API-level errors embedded in response
+        if let Some(err) = completion.error {
+            if let Some(msg) = err.message {
+                bail!("{} API error: {}", self.provider_name, msg);
+            }
+        }
 
-        Ok(content.trim().to_string())
+        let choice = completion.choices
+            .and_then(|c| c.into_iter().next());
+
+        let content = match choice {
+            Some(c) => {
+                // Warn if truncated
+                if c.finish_reason.as_deref() == Some("length") {
+                    eprintln!("  {} Response was truncated (hit max_tokens)", "⚠".to_string());
+                }
+                c.message.content.unwrap_or_default()
+            }
+            None => bail!("{} returned no choices in response", self.provider_name),
+        };
+
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            bail!("{} returned empty response content", self.provider_name);
+        }
+
+        Ok(trimmed.to_string())
     }
 
     fn list_models(&self) -> Result<Vec<ModelInfo>> {

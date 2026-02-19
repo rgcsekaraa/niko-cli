@@ -16,6 +16,8 @@ pub struct OllamaProvider {
 #[derive(Deserialize)]
 struct ChatResponse {
     message: Option<ChatMessage>,
+    #[serde(default)]
+    done: bool,
 }
 
 #[derive(Deserialize)]
@@ -44,8 +46,13 @@ struct PullProgress {
 
 impl OllamaProvider {
     pub fn new(base_url: &str, model: &str) -> Result<Self> {
+        // Reusable connection pool with keep-alive for fast sequential requests
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(300))
+            .connect_timeout(Duration::from_secs(5))
+            .pool_max_idle_per_host(4)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -59,7 +66,7 @@ impl OllamaProvider {
     fn is_server_running(&self) -> bool {
         self.client
             .get(format!("{}/api/tags", self.base_url))
-            .timeout(Duration::from_secs(3))
+            .timeout(Duration::from_secs(2))
             .send()
             .map(|r| r.status().is_success())
             .unwrap_or(false)
@@ -99,7 +106,7 @@ impl OllamaProvider {
         }).collect())
     }
 
-    /// Pull a model with progress
+    /// Pull a model with progress display
     pub fn pull_model(&self, model: &str) -> Result<()> {
         eprintln!("  Downloading '{}'...", model);
 
@@ -113,7 +120,9 @@ impl OllamaProvider {
             .context("Failed to start model download")?;
 
         if !resp.status().is_success() {
-            bail!("Ollama pull failed: {}", resp.status());
+            let status = resp.status();
+            let text = resp.text().unwrap_or_default();
+            bail!("Ollama pull failed ({}): {}", status, text);
         }
 
         let reader = BufReader::new(resp);
@@ -121,6 +130,7 @@ impl OllamaProvider {
 
         for line in reader.lines() {
             let line = match line { Ok(l) => l, Err(_) => continue };
+            if line.trim().is_empty() { continue; }
             if let Ok(p) = serde_json::from_str::<PullProgress>(&line) {
                 let status = p.status.unwrap_or_default();
                 if let (Some(done), Some(total)) = (p.completed, p.total) {
@@ -143,7 +153,7 @@ impl OllamaProvider {
             bail!(
                 "No model selected for Ollama.\n\
                  Run 'niko settings configure' to select a model,\n\
-                 or 'niko settings set ollama model <name>' to set one."
+                 or 'niko settings set ollama.model <name>' to set one."
             );
         }
 
@@ -175,6 +185,16 @@ impl Provider for OllamaProvider {
 
         self.ensure_model_available()?;
 
+        // Determine context size based on prompt length (adaptive)
+        let total_chars = system_prompt.len() + user_prompt.len();
+        let num_ctx = if total_chars > 50_000 {
+            16384
+        } else if total_chars > 20_000 {
+            8192
+        } else {
+            4096
+        };
+
         let body = serde_json::json!({
             "model": self.model,
             "messages": [
@@ -185,6 +205,7 @@ impl Provider for OllamaProvider {
             "options": {
                 "temperature": 0.1,
                 "num_predict": 4096,
+                "num_ctx": num_ctx,
                 "top_p": 0.7,
                 "top_k": 20,
                 "repeat_penalty": 1.2
@@ -203,9 +224,19 @@ impl Provider for OllamaProvider {
             bail!("Ollama error ({}): {}", status, text);
         }
 
-        let chat: ChatResponse = resp.json().context("Failed to parse response")?;
-        let content = chat.message.map(|m| m.content).unwrap_or_default();
-        Ok(content.trim().to_string())
+        let chat: ChatResponse = resp.json().context("Failed to parse Ollama response")?;
+
+        // Validate response
+        let content = chat.message
+            .map(|m| m.content)
+            .unwrap_or_default();
+
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            bail!("Ollama returned an empty response (model may have hit context limit)");
+        }
+
+        Ok(trimmed.to_string())
     }
 
     fn list_models(&self) -> Result<Vec<ModelInfo>> {
@@ -218,7 +249,6 @@ impl Provider for OllamaProvider {
 
 // ─── Ollama installation helpers ────────────────────────────────────────────
 
-/// Check if Ollama is installed on this system
 pub fn is_ollama_installed() -> bool {
     Command::new("ollama")
         .arg("--version")
@@ -227,35 +257,25 @@ pub fn is_ollama_installed() -> bool {
         .unwrap_or(false)
 }
 
-/// Check if Ollama server is reachable
 pub fn is_ollama_running() -> bool {
-    reqwest::blocking::Client::new()
-        .get("http://127.0.0.1:11434/api/tags")
+    reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(2))
-        .send()
-        .map(|r| r.status().is_success())
+        .connect_timeout(Duration::from_secs(1))
+        .build()
+        .ok()
+        .and_then(|c| {
+            c.get("http://127.0.0.1:11434/api/tags")
+                .send()
+                .ok()
+                .map(|r| r.status().is_success())
+        })
         .unwrap_or(false)
 }
 
-/// Install Ollama (cross-platform)
 pub fn install_ollama() -> Result<()> {
     eprintln!("  Installing Ollama...");
 
-    if cfg!(target_os = "macos") {
-        // macOS: use the official install script
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg("curl -fsSL https://ollama.com/install.sh | sh")
-            .status()
-            .context("Failed to run Ollama installer")?;
-
-        if !status.success() {
-            bail!(
-                "Ollama installation failed.\n\
-                 Install manually from: https://ollama.com/download"
-            );
-        }
-    } else if cfg!(target_os = "linux") {
+    if cfg!(target_os = "macos") || cfg!(target_os = "linux") {
         let status = Command::new("sh")
             .arg("-c")
             .arg("curl -fsSL https://ollama.com/install.sh | sh")
@@ -269,7 +289,6 @@ pub fn install_ollama() -> Result<()> {
             );
         }
     } else if cfg!(target_os = "windows") {
-        // Windows: download and run the installer via PowerShell
         let status = Command::new("powershell")
             .args([
                 "-Command",
@@ -292,10 +311,7 @@ pub fn install_ollama() -> Result<()> {
     Ok(())
 }
 
-/// Search for models in the Ollama library (uses the search endpoint)
 pub fn search_ollama_models(query: &str) -> Result<Vec<ModelInfo>> {
-    // Ollama doesn't have a public search API, so we provide well-known coding models
-    // and filter by query
     let known_models = vec![
         ("qwen2.5-coder:0.5b", 0.5),
         ("qwen2.5-coder:1.5b", 1.5),
