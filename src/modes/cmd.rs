@@ -25,7 +25,13 @@ pub fn run(query: &str, provider_override: Option<&str>, verbose: bool) -> Resul
     }
 
     let ctx = prompt::gather_context();
-    let system_prompt = prompt::cmd_system_prompt(&ctx);
+    let mut system_prompt = prompt::cmd_system_prompt(&ctx);
+
+    // Dynamic help discovery: run --help for tools mentioned in query
+    let help_context = prompt::discover_tool_help(query, verbose);
+    if !help_context.is_empty() {
+        system_prompt.push_str(&help_context);
+    }
 
     let mut spinner = ui::Spinner::new("Thinking...");
     spinner.start();
