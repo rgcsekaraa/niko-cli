@@ -1,0 +1,32 @@
+[package]
+name = "niko"
+version = "2.0.0"
+edition = "2021"
+description = "AI-powered CLI: explain code, generate shell commands, manage settings"
+license = "MIT"
+repository = "https://github.com/rgcsekaraa/niko-cli"
+
+[[bin]]
+name = "niko"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+colored = "2"
+indicatif = "0.17"
+sysinfo = "0.32"
+dirs = "5"
+arboard = "3"
+anyhow = "1"
+thiserror = "2"
+regex = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
