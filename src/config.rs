@@ -315,3 +315,19 @@ pub fn active_provider() -> Result<(String, ProviderConfig)> {
         ))?;
     Ok((name.clone(), pcfg))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_has_active_ollama_provider() {
+        let cfg = default_config();
+        assert_eq!(cfg.active_provider, "ollama");
+        assert!(cfg.providers.contains_key("ollama"));
+
+        let ollama = cfg.providers.get("ollama").unwrap();
+        assert_eq!(ollama.kind, "ollama");
+        assert_eq!(ollama.base_url, "http://127.0.0.1:11434");
+    }
+}

@@ -7,8 +7,54 @@ use crate::config::{self, ProviderConfig};
 use crate::llm;
 use crate::llm::ollama;
 use crate::llm::Provider;
-use crate::ui;
+mod ui {
+    use colored::Colorize;
 
+    pub fn box_top(title: &str) {
+        eprintln!("┌─ {}", title);
+    }
+    pub fn box_empty() {
+        eprintln!("│");
+    }
+    pub fn box_line(text: &str) {
+        eprintln!("│ {}", text);
+    }
+    pub fn box_kv(k: &str, v: &str) {
+        eprintln!("│ {}: {}", k, v);
+    }
+    pub fn box_kv_bold(k: &str, v: &str) {
+        eprintln!("│ {}: {}", k.bold(), v);
+    }
+    pub fn box_sep() {
+        eprintln!("├─────────────────────────────────────────────────");
+    }
+    pub fn box_bottom() {
+        eprintln!("└─────────────────────────────────────────────────");
+    }
+
+    pub fn print_dim(s: &str) {
+        eprintln!("{}", s.dimmed());
+    }
+    pub fn print_warning(s: &str) {
+        eprintln!("{} {}", "⚠".yellow().bold(), s.yellow());
+    }
+    pub fn print_success(s: &str) {
+        eprintln!("{} {}", "✓".green().bold(), s.green());
+    }
+
+    pub struct Spinner<'a> {
+        msg: &'a str,
+    }
+    impl<'a> Spinner<'a> {
+        pub fn new(msg: &'a str) -> Self {
+            Self { msg }
+        }
+        pub fn start(&mut self) {
+            eprintln!("⠋ {}", self.msg.dimmed());
+        }
+        pub fn stop(&mut self) {}
+    }
+}
 /// Settings action types
 pub enum Action {
     Show,
@@ -252,7 +298,8 @@ fn configure_ollama(name: &str, default_url: &str) -> Result<()> {
     ui::box_sep();
 
     // List local models
-    let provider = llm::ollama::OllamaProvider::new(default_url, "")?;
+    let provider =
+        llm::ollama::OllamaProvider::new(default_url, "", std::collections::HashMap::new())?;
     let local_models = provider.list_models().unwrap_or_default();
 
     if !local_models.is_empty() {

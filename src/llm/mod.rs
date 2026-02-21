@@ -15,24 +15,36 @@ const MAX_RETRIES: u32 = 3;
 const RETRY_BASE_DELAY_MS: u64 = 500;
 const RETRY_MAX_DELAY_MS: u64 = 8000;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Role {
+    System,
+    User,
+    Assistant,
+}
+
+#[derive(Debug, Clone)]
+pub struct Message {
+    pub role: Role,
+    pub content: String,
+}
+
 /// Trait for all LLM providers
 pub trait Provider: Send + Sync {
     /// Provider name
     fn name(&self) -> &str;
 
     /// Generate a response (non-streaming)
-    fn generate(&self, system_prompt: &str, user_prompt: &str, max_tokens: u32) -> Result<String>;
+    fn generate(&self, messages: &[Message], max_tokens: u32) -> Result<String>;
 
     /// Stream tokens to a callback, return accumulated response.
     /// Default: falls back to non-streaming generate.
     fn generate_stream(
         &self,
-        system_prompt: &str,
-        user_prompt: &str,
+        messages: &[Message],
         max_tokens: u32,
         on_token: &mut dyn FnMut(&str),
     ) -> Result<String> {
-        let result = self.generate(system_prompt, user_prompt, max_tokens)?;
+        let result = self.generate(messages, max_tokens)?;
         on_token(&result);
         Ok(result)
     }
@@ -92,14 +104,13 @@ fn is_retryable_error(err: &anyhow::Error) -> bool {
 /// Non-streaming generate with retry — used for cmd mode and synthesis steps
 pub fn generate_with_retry(
     provider: &dyn Provider,
-    system_prompt: &str,
-    user_prompt: &str,
+    messages: &[Message],
     max_tokens: u32,
 ) -> Result<String> {
     let mut last_err = None;
 
     for attempt in 0..=MAX_RETRIES {
-        match provider.generate(system_prompt, user_prompt, max_tokens) {
+        match provider.generate(messages, max_tokens) {
             Ok(response) => {
                 let trimmed = response.trim();
                 if trimmed.is_empty() {
@@ -147,13 +158,12 @@ pub fn generate_with_retry(
 /// Retries only on initial connection failure (before any tokens arrive).
 pub fn generate_streaming(
     provider: &dyn Provider,
-    system_prompt: &str,
-    user_prompt: &str,
+    messages: &[Message],
     max_tokens: u32,
     on_token: &mut dyn FnMut(&str),
 ) -> Result<String> {
     // Try once; if connection fails before any tokens, retry with non-streaming
-    match provider.generate_stream(system_prompt, user_prompt, max_tokens, on_token) {
+    match provider.generate_stream(messages, max_tokens, on_token) {
         Ok(result) => {
             let trimmed = result.trim();
             if trimmed.is_empty() {
@@ -165,7 +175,7 @@ pub fn generate_streaming(
             if is_retryable_error(&e) {
                 eprintln!("  ↻ Stream failed, retrying without streaming…");
                 // Fallback to non-streaming with retry
-                generate_with_retry(provider, system_prompt, user_prompt, max_tokens)
+                generate_with_retry(provider, messages, max_tokens)
             } else {
                 Err(e)
             }
@@ -207,6 +217,7 @@ pub fn from_config(name: &str, pcfg: &ProviderConfig) -> Result<Box<dyn Provider
             Ok(Box::new(ollama::OllamaProvider::new(
                 base_url,
                 &pcfg.model,
+                pcfg.options.clone(),
             )?))
         }
         "openai_compat" => Ok(Box::new(openai_compat::OpenAICompatProvider::new(
@@ -274,4 +285,29 @@ pub fn model_fits_in_ram(param_billions: f64) -> bool {
     }
     let max = config::max_model_size_for_ram() as f64;
     param_billions <= max
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn estimate_params_from_model_name_tokens() {
+        assert_eq!(estimate_param_billions("qwen2.5-coder:7b", 0), 7.0);
+        assert_eq!(estimate_param_billions("llama3.2_1b", 0), 1.0);
+        assert_eq!(estimate_param_billions("model-14b-instruct", 0), 14.0);
+    }
+
+    #[test]
+    fn estimate_params_from_model_size_fallback() {
+        let one_b_params_q4_bytes = 500_000_000_u64;
+        let estimated = estimate_param_billions("unknown-model", one_b_params_q4_bytes);
+        assert!((estimated - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn non_positive_model_size_is_always_allowed() {
+        assert!(model_fits_in_ram(0.0));
+        assert!(model_fits_in_ram(-1.0));
+    }
 }

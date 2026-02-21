@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
 use std::time::Duration;
@@ -10,6 +11,7 @@ use crate::llm::{estimate_param_billions, ModelInfo, Provider};
 pub struct OllamaProvider {
     base_url: String,
     model: String,
+    options: HashMap<String, String>,
     client: reqwest::blocking::Client,
 }
 
@@ -57,7 +59,7 @@ struct PullProgress {
 }
 
 impl OllamaProvider {
-    pub fn new(base_url: &str, model: &str) -> Result<Self> {
+    pub fn new(base_url: &str, model: &str, options: HashMap<String, String>) -> Result<Self> {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(300))
             .connect_timeout(Duration::from_secs(5))
@@ -70,8 +72,23 @@ impl OllamaProvider {
         Ok(Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             model: model.to_string(),
+            options,
             client,
         })
+    }
+
+    fn opt_f64(&self, key: &str, default: f64) -> f64 {
+        self.options
+            .get(key)
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(default)
+    }
+
+    fn opt_u32(&self, key: &str, default: u32) -> u32 {
+        self.options
+            .get(key)
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(default)
     }
 
     fn is_server_running(&self) -> bool {
@@ -190,14 +207,25 @@ impl OllamaProvider {
     /// Build the request body with performance optimizations
     fn build_request_body(
         &self,
-        system_prompt: &str,
-        user_prompt: &str,
+        messages: &[crate::llm::Message],
         max_tokens: u32,
         stream: bool,
     ) -> serde_json::Value {
+        let mut total_chars = 0;
+        let mut api_messages = Vec::new();
+
+        for msg in messages {
+            total_chars += msg.content.len();
+            let role_str = match msg.role {
+                crate::llm::Role::System => "system",
+                crate::llm::Role::User => "user",
+                crate::llm::Role::Assistant => "assistant",
+            };
+            api_messages.push(serde_json::json!({ "role": role_str, "content": msg.content }));
+        }
+
         // Adaptive context window based on input size
-        let total_chars = system_prompt.len() + user_prompt.len();
-        let num_ctx = if total_chars > 50_000 {
+        let adaptive_num_ctx = if total_chars > 50_000 {
             16384
         } else if total_chars > 20_000 {
             8192
@@ -205,21 +233,31 @@ impl OllamaProvider {
             4096
         };
 
+        let num_ctx = self.opt_u32("num_ctx", adaptive_num_ctx);
+        let num_thread = self.opt_u32(
+            "num_thread",
+            std::thread::available_parallelism()
+                .map(|n| n.get() as u32)
+                .unwrap_or(4),
+        );
+        let temperature = self.opt_f64("temperature", 0.0);
+        let top_p = self.opt_f64("top_p", 0.9);
+        let top_k = self.opt_u32("top_k", 40);
+        let repeat_penalty = self.opt_f64("repeat_penalty", 1.1);
+
         serde_json::json!({
             "model": self.model,
-            "messages": [
-                { "role": "system", "content": system_prompt },
-                { "role": "user", "content": user_prompt }
-            ],
+            "messages": api_messages,
             "stream": stream,
             "keep_alive": "30m",
             "options": {
-                "temperature": 0.1,
+                "temperature": temperature,
                 "num_predict": max_tokens,
                 "num_ctx": num_ctx,
-                "top_p": 0.7,
-                "top_k": 20,
-                "repeat_penalty": 1.2,
+                "num_thread": num_thread,
+                "top_p": top_p,
+                "top_k": top_k,
+                "repeat_penalty": repeat_penalty,
                 "flash_attn": true
             }
         })
@@ -235,9 +273,9 @@ impl Provider for OllamaProvider {
         self.is_server_running()
     }
 
-    fn generate(&self, system_prompt: &str, user_prompt: &str, max_tokens: u32) -> Result<String> {
+    fn generate(&self, messages: &[crate::llm::Message], max_tokens: u32) -> Result<String> {
         // No pre-check — just attempt the request, handle errors directly
-        let body = self.build_request_body(system_prompt, user_prompt, max_tokens, false);
+        let body = self.build_request_body(messages, max_tokens, false);
 
         // Ensure model is pulled (only checks on first call, then server has it cached)
         self.ensure_model_available().map_err(|e| {
@@ -289,8 +327,7 @@ impl Provider for OllamaProvider {
 
     fn generate_stream(
         &self,
-        system_prompt: &str,
-        user_prompt: &str,
+        messages: &[crate::llm::Message],
         max_tokens: u32,
         on_token: &mut dyn FnMut(&str),
     ) -> Result<String> {
@@ -305,7 +342,7 @@ impl Provider for OllamaProvider {
             }
         })?;
 
-        let body = self.build_request_body(system_prompt, user_prompt, max_tokens, true);
+        let body = self.build_request_body(messages, max_tokens, true);
 
         let resp = self
             .client

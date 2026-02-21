@@ -1,10 +1,7 @@
-mod chunker;
 mod config;
 mod llm;
 mod modes;
 mod prompt;
-mod safety;
-mod ui;
 
 mod tui;
 
@@ -16,9 +13,7 @@ use colored::Colorize;
     name = "niko",
     version,
     about = "AI-powered CLI: explain code, generate commands, manage LLM providers",
-    long_about = "Niko is an AI-powered CLI tool with three modes:\n\n\
-    • niko cmd \"find large files\"   — Generate shell commands from natural language\n\
-    • niko explain                   — Explain code (paste or pipe, handles any size)\n\
+    long_about = "Niko is an AI-powered CLI conversational assistant.\n\n\
     • niko settings configure        — Set up any LLM provider dynamically\n\
     \n\
     Supports: Ollama (local), OpenAI, Claude, DeepSeek, Grok, Groq, Mistral, Together, OpenRouter, and any OpenAI-compatible API."
@@ -42,36 +37,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate a shell command from natural language (default mode)
-    Cmd {
-        /// Natural language description of the command you need
-        #[arg(trailing_var_arg = true)]
-        query: Vec<String>,
-
-        /// Override the default LLM provider
-        #[arg(short, long)]
-        provider: Option<String>,
-
-        /// Show debug information
-        #[arg(short, long)]
-        verbose: bool,
-    },
-
-    /// Explain code — paste or pipe code of any size
-    Explain {
-        /// Optional file path to explain (otherwise reads from stdin)
-        #[arg(short, long)]
-        file: Option<String>,
-
-        /// Override the default LLM provider
-        #[arg(short, long)]
-        provider: Option<String>,
-
-        /// Show debug information
-        #[arg(short, long)]
-        verbose: bool,
-    },
-
     /// View and manage configuration
     Settings {
         #[command(subcommand)]
@@ -100,25 +65,6 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Some(Commands::Cmd {
-            query,
-            provider,
-            verbose,
-        }) => {
-            let provider_ref = provider.as_deref().or(cli.provider.as_deref());
-            let query_str = query.join(" ");
-            modes::cmd::run(&query_str, provider_ref, verbose || cli.verbose)
-        }
-
-        Some(Commands::Explain {
-            file,
-            provider,
-            verbose,
-        }) => {
-            let provider_ref = provider.as_deref().or(cli.provider.as_deref());
-            modes::explain::run(file.as_deref(), provider_ref, verbose || cli.verbose)
-        }
-
         Some(Commands::Settings { action }) => {
             let settings_action = match action {
                 Some(SettingsAction::Show) => Some(modes::settings::Action::Show),
@@ -139,15 +85,11 @@ fn main() {
         }
 
         None => {
-            // Default mode: if args provided, treat as cmd
             if !cli.query.is_empty() {
-                let query_str = cli.query.join(" ");
-                modes::cmd::run(&query_str, cli.provider.as_deref(), cli.verbose)
+                run_query_mode(&cli)
             } else {
-                // No args — launch TUI
+                // No args — launch TUI Chat
                 if let Err(e) = tui::run() {
-                    // If TUI fails (e.g. not a tty), fall back to help?
-                    // Or just print error.
                     eprintln!("Error launching TUI: {}", e);
                 }
                 Ok(())
@@ -159,4 +101,35 @@ fn main() {
         eprintln!("{} {}", "✗".red().bold(), e);
         std::process::exit(1);
     }
+}
+
+fn run_query_mode(cli: &Cli) -> anyhow::Result<()> {
+    let query = cli.query.join(" ");
+    let ctx = prompt::gather_context();
+    let mut system = prompt::chat_system_prompt(&ctx);
+
+    let tool_help = prompt::discover_tool_help(&query, cli.verbose);
+    if !tool_help.is_empty() {
+        system.push_str(&tool_help);
+    }
+
+    let messages = vec![
+        llm::Message {
+            role: llm::Role::System,
+            content: system,
+        },
+        llm::Message {
+            role: llm::Role::User,
+            content: query,
+        },
+    ];
+
+    let provider = llm::get_provider(cli.provider.as_deref())?;
+    if cli.verbose {
+        eprintln!("Using provider: {}", provider.name());
+    }
+
+    let response = llm::generate_with_retry(provider.as_ref(), &messages, 2048)?;
+    println!("{response}");
+    Ok(())
 }
