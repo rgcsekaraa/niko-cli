@@ -170,7 +170,8 @@ fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
 fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
     let mut spans = Vec::new();
     let mut current_pos = 0;
-    let line_trim = line.trim();
+    let line_clean = line.replace('\n', "").replace('\r', "");
+    let line_trim = line_clean.trim();
 
     // Check for headers
     if line_trim.starts_with("#") {
@@ -186,12 +187,12 @@ fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
     // Bullet points
     if line_trim.starts_with("- ") || line_trim.starts_with("* ") {
         spans.push(Span::styled(" • ", Style::default().fg(Color::Cyan)));
-        current_pos = line.find(|c| c == '-' || c == '*').unwrap() + 2;
+        current_pos = line_clean.find(|c| c == '-' || c == '*').unwrap() + 2;
     } else {
         spans.push(Span::from("  "));
     }
 
-    let remaining = &line[current_pos..];
+    let remaining = &line_clean[current_pos..];
     
     // Simple bold/code parsing
     let mut i = 0;
@@ -218,11 +219,6 @@ fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
                 text_start = i;
             } else {
                 i += 2;
-                // Treat unmatched ** as literal text by not updating text_start
-                // but we need to move text_start forward if we want to avoid duplication
-                // Actually, if we skip it here, the final push will catch it correctly.
-                // But wait, if we find ANOTHER tag later? 
-                // Let's just update text_start only on successful match.
             }
         } else if chars[i] == '`' {
             if i > text_start {

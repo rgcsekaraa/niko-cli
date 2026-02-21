@@ -36,7 +36,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
         match events.next()? {
             Event::Key(key) => {
-                // Global quit bindings
+                // Global quit bindings - intercept immediately for all routes
                 if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
                     && (key.code == KeyCode::Char('c') || key.code == KeyCode::Char('d'))
                 {
@@ -45,7 +45,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 }
 
                 let now = std::time::Instant::now();
-                let is_paste = now.duration_since(app.last_key_time) < Duration::from_millis(15);
+                // To prevent normal typing from looking like a paste, and to ensure
+                // that hitting Enter *after* a paste works, we relax the heuristic.
+                let is_paste = now.duration_since(app.last_key_time) < Duration::from_millis(5);
                 app.last_key_time = now;
 
                 match app.route {
