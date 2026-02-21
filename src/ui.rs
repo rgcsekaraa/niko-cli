@@ -2,6 +2,7 @@ use std::io::{self, BufRead, IsTerminal, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use crossterm::terminal;
 
 use colored::*;
 
@@ -18,25 +19,46 @@ const BOX_V: &str = "│";
 const BOX_SEP_L: &str = "├";
 const BOX_SEP_R: &str = "┤";
 
-/// Width of the TUI box (excluding border characters)
-const BOX_WIDTH: usize = 62;
+/// Print a horizontal rule to the terminal
+pub fn print_rule() {
+    let width = get_box_width();
+    println!("{}", BOX_H.repeat(width + 2).dimmed());
+}
+/// Minimum width for the TUI box
+const MIN_BOX_WIDTH: usize = 62;
+/// Maximum width for the TUI box (to prevent it becoming too sparse on ultra-wide screens)
+const MAX_BOX_WIDTH: usize = 100;
+
+/// Get the current terminal width with a small margin
+pub fn get_box_width() -> usize {
+    if let Ok((w, _)) = terminal::size() {
+        // Use full width minus margin, clamped between MIN and MAX
+        let target = (w as usize).saturating_sub(4);
+        target.clamp(MIN_BOX_WIDTH, MAX_BOX_WIDTH)
+    } else {
+        MIN_BOX_WIDTH
+    }
+}
 
 // ─── Box drawing helpers ────────────────────────────────────────────────────
 
 /// Draw a top border with an optional title
 pub fn box_top(title: &str) {
+    let width = get_box_width();
+    let sanitized_title = sanitize_text(title);
+    let title = &sanitized_title;
     if title.is_empty() {
         eprintln!(
             "{}{}{}",
             BOX_TL.dimmed(),
-            BOX_H.repeat(BOX_WIDTH).dimmed(),
+            BOX_H.repeat(width).dimmed(),
             BOX_TR.dimmed()
         );
     } else {
         let title_display = format!(" {} ", title);
         let title_plain_len = strip_ansi_len(&title_display);
-        let padding = if BOX_WIDTH > title_plain_len + 2 {
-            BOX_WIDTH - title_plain_len - 2
+        let padding = if width > title_plain_len + 2 {
+            width - title_plain_len - 2
         } else {
             0
         };
@@ -53,39 +75,52 @@ pub fn box_top(title: &str) {
 
 /// Draw a bottom border
 pub fn box_bottom() {
+    let width = get_box_width();
     eprintln!(
         "{}{}{}",
         BOX_BL.dimmed(),
-        BOX_H.repeat(BOX_WIDTH).dimmed(),
+        BOX_H.repeat(width).dimmed(),
         BOX_BR.dimmed()
     );
 }
 
 /// Draw a separator line
 pub fn box_sep() {
+    let width = get_box_width();
     eprintln!(
         "{}{}{}",
         BOX_SEP_L.dimmed(),
-        BOX_H.repeat(BOX_WIDTH).dimmed(),
+        BOX_H.repeat(width).dimmed(),
         BOX_SEP_R.dimmed()
     );
 }
 
 /// Draw an empty line inside a box
 pub fn box_empty() {
+    let width = get_box_width();
     eprintln!(
         "{}{}{}",
         BOX_V.dimmed(),
-        " ".repeat(BOX_WIDTH),
+        " ".repeat(width),
         BOX_V.dimmed()
     );
+}
+
+pub fn sanitize_text(text: &str) -> String {
+    // Replace em-dashes with standard hyphens as a safeguard mechanism 
+    // against multibyte character length calculation issues in older terminals
+    text.replace('—', "-")
 }
 
 /// Draw a line inside a box with content (left-aligned with 2-char indent)
 /// Content that exceeds BOX_WIDTH is automatically truncated with "…"
 pub fn box_line(content: &str) {
-    // Available width for content: BOX_WIDTH minus the leading space (1 char) and trailing space (1 char)
-    let max_content_width = BOX_WIDTH - 2;
+    let width = get_box_width();
+    let sanitized_content = sanitize_text(content);
+    let content = &sanitized_content;
+    
+    // Available width for content: width minus the leading space (1 char) and trailing space (1 char)
+    let max_content_width = width - 2;
     let plain_len = strip_ansi_len(content);
 
     let (display_content, display_len) = if plain_len > max_content_width {
@@ -112,12 +147,16 @@ pub fn box_line(content: &str) {
 
 /// Draw a key-value line inside a box
 pub fn box_kv(key: &str, value: &str) {
+    let key = sanitize_text(key);
+    let value = sanitize_text(value);
     let formatted = format!("{} {}", key.dimmed(), value);
     box_line(&formatted);
 }
 
 /// Draw a key-value line with the key bold
 pub fn box_kv_bold(key: &str, value: &str) {
+    let key = sanitize_text(key);
+    let value = sanitize_text(value);
     let formatted = format!("{} {}", key.bold(), value);
     box_line(&formatted);
 }
@@ -256,7 +295,7 @@ pub fn read_stdin_input() -> io::Result<String> {
     eprintln!();
     box_top(&"Paste Code".bold().to_string());
     box_line(
-        &"Paste your code below. Press Ctrl-D to finish."
+        &"Paste your code below. Press Ctrl-D or two empty lines to finish."
             .dimmed()
             .to_string(),
     );
@@ -264,18 +303,30 @@ pub fn read_stdin_input() -> io::Result<String> {
 
     let mut lines = Vec::new();
     let reader = stdin.lock();
+    let mut empty_count = 0;
 
     for line in reader.lines() {
         let line = line?;
+        
+        // Two consecutive empty lines to finish (common CLI pattern for multi-line input)
+        if line.trim().is_empty() {
+            empty_count += 1;
+            if empty_count >= 2 {
+                break;
+            }
+        } else {
+            empty_count = 0;
+        }
+        
         lines.push(line);
 
-        // Update live counter on stderr (overwrite the same line)
-        eprint!(
-            "\r\x1b[K{} {}",
-            BOX_V.dimmed(),
-            format!("[{} lines pasted]", lines.len()).cyan()
-        );
-        let _ = io::stderr().flush();
+        // Live counter shows status during paste
+    eprint!(
+        "\r\x1b[K{} {}",
+        BOX_V.dimmed(),
+        format!("[{} lines pasted]", lines.len()).cyan()
+    );
+    let _ = io::stderr().flush();
     }
 
     // Clear the counter line and show final summary
@@ -303,9 +354,8 @@ pub fn read_stdin_input() -> io::Result<String> {
 pub fn show_code_preview(code: &str) -> bool {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
-
-    if count <= 20 {
-        // Short code — show it all in a box
+    if count <= 5 {
+        // Very short code - show it all
         box_top(&format!("{}", format!("Code ({} lines)", count).dimmed()));
         for line in &lines {
             box_line(&line.dimmed().to_string());
@@ -314,27 +364,20 @@ pub fn show_code_preview(code: &str) -> bool {
         return false;
     }
 
-    // Large code — show preview with first 5 and last 3 lines
+    // Default: collapse for anything > 5 lines
     box_top(&format!("{}", format!("Code ({} lines)", count).dimmed()));
-
-    // First 5 lines
-    for line in lines.iter().take(5) {
-        box_line(&line.dimmed().to_string());
+    box_line(&lines[0].white().to_string());
+    if count > 2 {
+        box_line(&"".to_string());
+        box_line(&format!(
+            "   \u{22ef} {} lines hidden (press Enter to expand, or any key to continue)",
+            count - 2
+        ).dimmed().to_string());
+        box_line(&"".to_string());
     }
-
-    // Collapsed section
-    let hidden = count - 8; // 5 top + 3 bottom
-    box_line(&format!(
-        "   {} {}",
-        format!("⋯ {} lines hidden", hidden).dimmed(),
-        "(press Enter to expand, or any key + Enter to continue)".dimmed()
-    ));
-
-    // Last 3 lines
-    for line in lines.iter().skip(count - 3) {
-        box_line(&line.dimmed().to_string());
+    if count > 1 {
+        box_line(&lines[count - 1].white().to_string());
     }
-
     box_bottom();
 
     // Prompt for expansion
@@ -365,13 +408,44 @@ pub fn show_code_preview(code: &str) -> bool {
 
 // ─── Explanation display (Claude Code-inspired) ─────────────────────────────
 
-/// Display a formatted explanation result using box drawing
+/// Render a line of markdown-lite (bold, inline code)
+pub fn render_markdown(text: &str) -> String {
+    let mut result = text.to_string();
+    
+    // Bold: **text** -> styled bold
+    while let Some(start) = result.find("**") {
+        if let Some(end) = result[start+2..].find("**") {
+            let actual_end = start + 2 + end;
+            let content = &result[start+2..actual_end];
+            let replacement = content.bold().to_string();
+            result.replace_range(start..actual_end+2, &replacement);
+        } else {
+            break;
+        }
+    }
+    
+    // Inline code: `code` -> styled magenta
+    while let Some(start) = result.find('`') {
+        if let Some(end) = result[start+1..].find('`') {
+            let actual_end = start + 1 + end;
+            let content = &result[start+1..actual_end];
+            let replacement = content.magenta().to_string();
+            result.replace_range(start..actual_end+1, &replacement);
+        } else {
+            break;
+        }
+    }
+    
+    result
+}
+
+// ─── Explanation display (Claude Code/OpenCode-inspired) ─────────────────────
+
+/// Display a formatted explanation result with a borderless, minimalist aesthetic
 pub fn display_explanation(result: &crate::chunker::ExplainResult) {
     eprintln!();
 
-    // Header box
-    box_top(&format!("{}", "Explanation".bold()));
-
+    // Stats line
     let stats = format!(
         "{} lines analyzed{}",
         result.total_lines.to_string().cyan(),
@@ -384,49 +458,85 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
             String::new()
         }
     );
-    box_line(&stats);
-    box_bottom();
+    
+    println!("  {}  •  {}", "Explanation".bold().magenta(), stats.dimmed());
+    print_rule();
     eprintln!();
 
-    // Overall summary
+    // Overall summary with OpenCode styling
     if result.total_chunks > 1 {
-        println!("{}", "  Overview".bold());
-        println!("{}", "  ────────".dimmed());
+        println!("  {}", "Overview".bold().cyan());
+        println!("  {}", "────────".dimmed().cyan());
         for line in result.overall_summary.lines() {
-            println!("  {}", line);
+            let line = line.trim();
+            if line.is_empty() {
+                println!();
+                continue;
+            }
+            if line.starts_with("#") {
+                println!("  {}", render_markdown(line.trim_start_matches('#').trim()).bold().magenta());
+            } else if line.starts_with("- ") || line.starts_with("* ") {
+                println!("  {} {}", "•".cyan(), render_markdown(&line[2..]));
+            } else {
+                println!("  {}", render_markdown(line));
+            }
         }
         println!();
 
-        // Per-chunk details in a box
-        box_top(&format!("{}", "Detailed Analysis".dimmed()));
-        for (i, chunk) in result.chunk_explanations.iter().enumerate() {
-            if i > 0 {
-                box_sep();
-            }
-            box_line(&format!(
-                "{}",
-                format!("Lines {}-{}", chunk.start_line, chunk.end_line).bold()
-            ));
-            box_empty();
+        // Per-chunk details - Borderless
+        println!("  {}", "Detailed Analysis".bold().cyan());
+        println!("  {}", "─────────────────".dimmed().cyan());
+        for chunk in result.chunk_explanations.iter() {
+            eprintln!();
+            let chunk_title = format!("Lines {}-{}", chunk.start_line, chunk.end_line);
+            println!("  {} {}", "󰚗".magenta(), chunk_title.bold());
+            
             for line in chunk.explanation.lines() {
-                box_line(&format!("  {}", line));
+                let line = line.trim();
+                if line.is_empty() {
+                    println!();
+                } else if line.starts_with("### ") || line.starts_with("## ") {
+                    println!("  {}", render_markdown(line.trim_start_matches('#').trim()).bold().magenta());
+                } else if line.starts_with("- ") || line.starts_with("* ") {
+                    println!("  {} {}", "•".cyan(), render_markdown(&line[2..]));
+                } else {
+                    println!("  {}", render_markdown(line));
+                }
             }
         }
-        box_bottom();
     } else {
+        println!("  {}", "Analysis".bold().cyan());
+        println!("  {}", "────────".dimmed().cyan());
         for line in result.overall_summary.lines() {
-            println!("  {}", line);
+            let line = line.trim();
+            if line.is_empty() {
+                println!();
+                continue;
+            }
+            if line.starts_with("## ") || line.starts_with("### ") {
+                println!("\n  {}", render_markdown(line.trim_start_matches('#').trim()).bold().magenta());
+            } else if line.starts_with("- ") || line.starts_with("* ") {
+                println!("  {} {}", "•".cyan(), render_markdown(&line[2..]));
+            } else {
+                println!("  {}", render_markdown(line));
+            }
         }
     }
     println!();
 
-    // Follow-up questions
+    // Follow-up questions - Borderless
     if !result.follow_up_questions.is_empty() {
-        box_top(&format!("{}", "Follow-up Questions".dimmed()));
+        print_rule();
+        println!("  {}", "Follow-up Questions".bold().cyan());
         for (i, q) in result.follow_up_questions.iter().enumerate() {
-            box_line(&format!("{}  {}", format!("{}.", i + 1).cyan(), q));
+            let cat_end = q.find(']').unwrap_or(0);
+            let (cat, text) = if cat_end > 0 {
+                (format!("{} ", &q[..=cat_end].cyan()), &q[cat_end+1..])
+            } else {
+                (String::new(), q.as_str())
+            };
+            println!("  {} {}{}", format!("{}.", i + 1).dimmed(), cat, render_markdown(text));
         }
-        box_bottom();
         eprintln!();
     }
 }

@@ -227,22 +227,28 @@ where
             llm::generate_with_retry(provider, &system_prompt, &user_prompt, CHUNK_MAX_TOKENS)?
         };
 
+        let sanitized_explanation = explanation.replace('—', "-");
+
         chunk_explanations.push(ChunkExplanation {
             start_line: chunk.start_line,
             end_line: chunk.end_line,
-            explanation,
+            explanation: sanitized_explanation,
         });
     }
 
     // Synthesis — always non-streaming with retry (needs full response for parsing)
     // We could stream status updates if we had a status callback, but for now we just run it.
-    let (summary, questions) = if total_chunks > 1 {
+    let (mut summary, mut questions) = if total_chunks > 1 {
         generate_summary_and_questions(provider, &chunk_explanations, total_lines)?
     } else {
         let explanation = &chunk_explanations[0].explanation;
         let questions = generate_follow_up_only(provider, explanation).unwrap_or_default();
         (explanation.clone(), questions)
     };
+
+    // Sanitize summary and questions to prevent any UI rendering panics on em-dashes
+    summary = summary.replace('—', "-");
+    questions = questions.into_iter().map(|q| q.replace('—', "-")).collect();
 
     Ok(ExplainResult {
         total_lines,

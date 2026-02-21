@@ -9,21 +9,21 @@ use std::thread;
 use std::time::Duration;
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, style::Style, Terminal};
 
 use crate::{chunker, llm, modes};
-use app::{App, Route, TuiMessage};
+use app::{App, Focus, Route, TuiMessage};
 use events::{Event, EventHandler};
 
 pub fn run() -> Result<(), Box<dyn Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -39,78 +39,111 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 match app.route {
                     Route::Menu => match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => app.exit = true,
-                        KeyCode::Char('1') => app.set_route(Route::CmdInput),
-                        KeyCode::Char('2') => app.set_route(Route::ExplainInput),
+                        KeyCode::Char('1') | KeyCode::Char('2') => app.set_route(Route::Main),
                         KeyCode::Char('3') => app.set_route(Route::Settings),
-                        _ => {}
-                    },
-                    Route::CmdInput => match key.code {
-                        KeyCode::Esc => app.set_route(Route::Menu),
+                        KeyCode::Up => {
+                            let i = match app.menu_state.selected() {
+                                Some(i) => if i == 0 { 3 } else { i - 1 },
+                                None => 0,
+                            };
+                            app.menu_state.select(Some(i));
+                        }
+                        KeyCode::Down => {
+                            let i = match app.menu_state.selected() {
+                                Some(i) => if i >= 3 { 0 } else { i + 1 },
+                                None => 0,
+                            };
+                            app.menu_state.select(Some(i));
+                        }
                         KeyCode::Enter => {
-                            let query = app.input_buffer.lines().join("\n");
-                            if !query.trim().is_empty() {
-                                app.is_loading = true;
-                                app.set_route(Route::Processing);
-                                app.streaming_buffer.clear(); // Clear stream buffer
-
-                                let sender = events.sender.clone();
-                                thread::spawn(move || {
-                                    // Generate command (non-streaming for now, or we could stream "thinking" logs)
-                                    // cmd::generate_command is blocking
-                                    let result = modes::cmd::generate_command(&query, None, false);
-                                    let msg = match result {
-                                        Ok(s) => TuiMessage::CmdResult(Ok(s)),
-                                        Err(e) => TuiMessage::CmdResult(Err(e.to_string())),
-                                    };
-                                    let _ = sender.send(Event::AppMessage(msg));
-                                });
+                            match app.menu_state.selected() {
+                                Some(0) | Some(1) => app.set_route(Route::Main),
+                                Some(2) => app.set_route(Route::Settings),
+                                Some(3) => app.exit = true,
+                                _ => {}
                             }
                         }
-                        _ => {
-                            app.input_buffer.input(key);
-                        }
+                        _ => {}
                     },
-                    Route::ExplainInput => {
+                    Route::Main => {
                         if key.code == KeyCode::Esc {
                             app.set_route(Route::Menu);
                         } else if key.code == KeyCode::Tab {
-                            use crate::tui::app::Focus;
-                            app.focus = if app.focus == Focus::Left { Focus::Right } else { Focus::Left };
-                        } else if key.code == KeyCode::Char('d') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            submit_explain(&mut app, &events.sender);
+                            app.focus = if app.focus == Focus::Input { Focus::Output } else { Focus::Input };
+                        } else if key.code == KeyCode::Enter && app.focus == Focus::Input {
+                            let input = app.input_buffer.lines().join("\n");
+                            if !input.trim().is_empty() {
+                                // Before starting new request, archive old results to history
+                                if !app.result_buffer.is_empty() {
+                                    app.history.push(crate::tui::app::HistoryEntry {
+                                        is_user: false,
+                                        text: app.result_buffer.clone(),
+                                    });
+                                    app.result_buffer.clear();
+                                }
+                                
+                                // Push user input to history
+                                app.history.push(crate::tui::app::HistoryEntry {
+                                    is_user: true,
+                                    text: input.clone(),
+                                });
+
+                                // Simple slash command detection
+                                if input.starts_with("/explain") || input.lines().count() > 1 {
+                                    submit_explain(&mut app, &events.sender);
+                                } else {
+                                    let query = if input.starts_with("/cmd ") {
+                                        input.trim_start_matches("/cmd ").to_string()
+                                    } else {
+                                        input.clone()
+                                    };
+                                    
+                                    app.is_loading = true;
+                                    app.set_route(Route::Processing);
+                                    app.streaming_buffer.clear();
+
+                                    let sender = events.sender.clone();
+                                    thread::spawn(move || {
+                                        let result = modes::cmd::generate_command(&query, None, false);
+                                        let msg = match result {
+                                            Ok(s) => TuiMessage::CmdResult(Ok(s)),
+                                            Err(e) => TuiMessage::CmdResult(Err(e.to_string())),
+                                        };
+                                        let _ = sender.send(Event::AppMessage(msg));
+                                    });
+                                }
+                                app.input_buffer = tui_textarea::TextArea::default();
+                                app.input_buffer.set_cursor_line_style(Style::default());
+                            }
                         } else {
-                            // Focus-based routing
-                            use crate::tui::app::Focus;
-                            if app.focus == Focus::Right {
+                            if app.focus == Focus::Output {
                                 match key.code {
-                                    KeyCode::Up => app.streaming_scroll = app.streaming_scroll.saturating_sub(1),
-                                    KeyCode::Down => app.streaming_scroll = app.streaming_scroll.saturating_add(1),
+                                    KeyCode::Up => app.result_scroll = app.result_scroll.saturating_sub(1),
+                                    KeyCode::Down => app.result_scroll = app.result_scroll.saturating_add(1),
+                                    KeyCode::PageUp => app.result_scroll = app.result_scroll.saturating_sub(10),
+                                    KeyCode::PageDown => app.result_scroll = app.result_scroll.saturating_add(10),
                                     _ => {}
                                 }
                             } else {
                                 app.input_buffer.input(key);
                             }
                         }
-                    },
+                    }
                     Route::Processing => {
-                        // While processing, maybe allow Esc to cancel (if we had CancellationToken)
-                        // For now, block esc or treat as "background"
                         if key.code == KeyCode::Esc {
-                            // Just go back to menu, thread continues but result ignored basically
                             app.is_loading = false;
                             app.set_route(Route::Menu);
                         }
                     }
-                    Route::ResultView => match key.code {
-                        KeyCode::Esc => app.set_route(Route::Menu),
-                        KeyCode::Char('q') => app.exit = true,
-                        // TODO: Implement 'c' for copy
-                        _ => {}
-                    },
                     Route::Settings => match key.code {
                         KeyCode::Esc => app.set_route(Route::Menu),
                         _ => {}
                     },
+                }
+            }
+            Event::Paste(s) => {
+                if app.route == Route::Main && app.focus == Focus::Input {
+                    app.input_buffer.insert_str(&s);
                 }
             }
             Event::Tick => {
@@ -132,19 +165,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         match res {
                             Ok(cmd) => {
                                 app.result_buffer = cmd;
-                                app.set_route(Route::ResultView);
+                                app.set_route(Route::Main);
                             }
                             Err(e) => {
                                 app.result_buffer = format!("Error: {}", e);
-                                app.set_route(Route::ResultView);
+                                app.set_route(Route::Main);
                             }
                         }
                     }
                     TuiMessage::ExplainResult(res) => {
                         app.is_loading = false;
+                        app.set_route(Route::Main);
                         match res {
                             Ok(explanation) => {
-                                // Synthesis is done.
                                 app.result_buffer = format!(
                                     "## Summary\n\n{}\n\n## Follow-up Questions\n\n- {}",
                                     explanation.overall_summary,
@@ -170,7 +203,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture
+        DisableMouseCapture,
+        DisableBracketedPaste
     )?;
     terminal.show_cursor()?;
 
@@ -185,9 +219,9 @@ fn submit_explain(app: &mut App, sender: &std::sync::mpsc::Sender<Event>) {
 
     app.is_loading = true;
     app.streaming_buffer.clear();
-    app.result_buffer.clear();
+    // app.result_buffer.clear(); // Already handled by the caller who pushes to history
     use crate::tui::app::Focus;
-    app.focus = Focus::Right;
+    app.focus = Focus::Output;
 
     let sender_token = sender.clone();
     let sender_final = sender.clone();

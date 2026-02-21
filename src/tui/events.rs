@@ -13,6 +13,7 @@ use crate::tui::app::TuiMessage;
 pub enum Event {
     Tick,
     Key(KeyEvent),
+    Paste(String),
     Resize,
     AppMessage(TuiMessage),
 }
@@ -44,6 +45,11 @@ impl EventHandler {
                                     .send(Event::Key(e))
                                     .expect("failed to send key event");
                             }
+                        }
+                        CrosstermEvent::Paste(s) => {
+                            handler_sender
+                                .send(Event::Paste(s))
+                                .expect("failed to send paste event");
                         }
                         CrosstermEvent::Resize(_, _) => {
                             handler_sender
