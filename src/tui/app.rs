@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use ratatui::{style::Style, widgets::ListState};
 use tui_textarea::TextArea;
 // use crate::chunker::ExplainResult;
@@ -48,6 +50,7 @@ pub struct App<'a> {
     pub history: Vec<HistoryEntry>,
     pub menu_state: ListState,
     pub pasted_code: Option<String>,
+    pub last_key_time: Instant,
 }
 
 impl<'a> Default for App<'a> {
@@ -73,6 +76,7 @@ impl<'a> Default for App<'a> {
             history: Vec::new(),
             menu_state,
             pasted_code: None,
+            last_key_time: std::time::Instant::now(),
         }
     }
 }

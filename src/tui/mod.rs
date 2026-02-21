@@ -36,6 +36,18 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
         match events.next()? {
             Event::Key(key) => {
+                // Global quit bindings
+                if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                    && (key.code == KeyCode::Char('c') || key.code == KeyCode::Char('d'))
+                {
+                    app.exit = true;
+                    continue;
+                }
+
+                let now = std::time::Instant::now();
+                let is_paste = now.duration_since(app.last_key_time) < Duration::from_millis(15);
+                app.last_key_time = now;
+
                 match app.route {
                     Route::Menu => match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => app.exit = true,
@@ -69,8 +81,16 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         if key.code == KeyCode::Esc {
                             app.set_route(Route::Menu);
                         } else if key.code == KeyCode::Tab {
+                            if is_paste && app.focus == Focus::Input {
+                                app.input_buffer.insert_str("    ");
+                                continue;
+                            }
                             app.focus = if app.focus == Focus::Input { Focus::Output } else { Focus::Input };
                         } else if key.code == KeyCode::Enter && app.focus == Focus::Input {
+                            if is_paste {
+                                app.input_buffer.insert_newline();
+                                continue;
+                            }
                             let mut input = app.input_buffer.lines().join("\n");
                             
                             // Combine with pasted code if it exists
@@ -98,7 +118,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
                                 app.history.push(crate::tui::app::HistoryEntry {
                                     is_user: true,
-                                    text: display_text,
+                                    text: display_text.replace('\r', ""),
                                 });
 
                                 // Simple slash command detection
@@ -156,12 +176,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             }
             Event::Paste(s) => {
                 if app.route == Route::Main && app.focus == Focus::Input {
-                    let lines_count = s.lines().count();
+                    let s_clean = s.replace('\r', "");
+                    let lines_count = s_clean.lines().count();
                     if lines_count > 1 {
-                        app.pasted_code = Some(s);
+                        app.pasted_code = Some(s_clean);
                         app.input_buffer.insert_str(&format!("[Pasted {} lines of code — Press Enter to submit]", lines_count));
                     } else {
-                        app.input_buffer.insert_str(&s);
+                        app.input_buffer.insert_str(&s_clean);
                     }
                 }
             }
@@ -174,16 +195,14 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             Event::AppMessage(msg) => {
                 match msg {
                     TuiMessage::Token(s) => {
-                        app.streaming_buffer.push_str(&s);
-                        // Also update result buffer live so user sees it?
-                        // Or Processing view should render streaming_buffer?
-                        // If we are in Processing route, user needs to see the stream.
+                        let clean_s = s.replace('\r', "").replace('\t', "    ");
+                        app.streaming_buffer.push_str(&clean_s);
                     }
                     TuiMessage::CmdResult(res) => {
                         app.is_loading = false;
                         match res {
                             Ok(cmd) => {
-                                app.result_buffer = cmd;
+                                app.result_buffer = cmd.replace('\r', "").replace('\t', "    ");
                                 app.set_route(Route::Main);
                             }
                             Err(e) => {
@@ -199,8 +218,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                             Ok(explanation) => {
                                 app.result_buffer = format!(
                                     "## Summary\n\n{}\n\n## Follow-up Questions\n\n- {}",
-                                    explanation.overall_summary,
-                                    explanation.follow_up_questions.join("\n- ")
+                                    explanation.overall_summary.replace('\r', "").replace('\t', "    "),
+                                    explanation.follow_up_questions.join("\n- ").replace('\r', "").replace('\t', "    ")
                                 );
                             }
                             Err(e) => {

@@ -149,15 +149,14 @@ fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
         let dots = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let spinner_char = dots[(app.spinner_state / 2 % 10) as usize];
         
-        if app.streaming_buffer.is_empty() {
-            history_text.lines.push(Line::from(vec![
-                Span::styled(format!("  {} Agent is thinking...", spinner_char), Style::default().fg(Color::Magenta)),
-            ]));
-        } else {
+        if !app.streaming_buffer.is_empty() {
             for line in app.streaming_buffer.lines() {
                 history_text.lines.push(line_to_spans(line, true));
             }
         }
+        history_text.lines.push(Line::from(vec![
+            Span::styled(format!("  {} Processing...", spinner_char), Style::default().fg(Color::Magenta)),
+        ]));
     }
 
     let p = Paragraph::new(history_text)
