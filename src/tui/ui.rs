@@ -159,9 +159,20 @@ fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
         ]));
     }
 
+    let total_lines = history_text.lines.len() as u16;
+    let max_scroll = total_lines.saturating_sub(area.height);
+
+    let current_scroll = if app.is_loading {
+        // Auto-scroll to bottom of the stream
+        max_scroll
+    } else {
+        // Otherwise, allow manual scrolling, but clamp to max
+        app.result_scroll.min(max_scroll)
+    };
+
     let p = Paragraph::new(history_text)
         .wrap(Wrap { trim: false })
-        .scroll((app.result_scroll, 0));
+        .scroll((current_scroll, 0));
         
     f.render_widget(p, area);
 }

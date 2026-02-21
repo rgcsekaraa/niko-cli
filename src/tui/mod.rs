@@ -202,14 +202,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     }
                     TuiMessage::CmdResult(res) => {
                         app.is_loading = false;
+                        app.set_route(Route::Main);
                         match res {
                             Ok(cmd) => {
                                 app.result_buffer = cmd.replace('\r', "").replace('\t', "    ");
-                                app.set_route(Route::Main);
                             }
                             Err(e) => {
                                 app.result_buffer = format!("Error: {}", e);
-                                app.set_route(Route::Main);
                             }
                         }
                     }
@@ -218,11 +217,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         app.set_route(Route::Main);
                         match res {
                             Ok(explanation) => {
-                                app.result_buffer = format!(
+                                let mut full_text = String::new();
+                                for chunk in explanation.chunk_explanations {
+                                    if !chunk.explanation.trim().is_empty() {
+                                        full_text.push_str(&chunk.explanation);
+                                        full_text.push_str("\n\n");
+                                    }
+                                }
+                                full_text.push_str(&format!(
                                     "## Summary\n\n{}\n\n## Follow-up Questions\n\n- {}",
                                     explanation.overall_summary.replace('\r', "").replace('\t', "    "),
                                     explanation.follow_up_questions.join("\n- ").replace('\r', "").replace('\t', "    ")
-                                );
+                                ));
+                                app.result_buffer = full_text;
                             }
                             Err(e) => {
                                 app.result_buffer = format!("Error: {}", e);
