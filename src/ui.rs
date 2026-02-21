@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use colored::*;
-use unicode_truncate::UnicodeTruncateStr;
+
 use unicode_width::UnicodeWidthStr;
 
 // ─── Box-drawing constants (Claude Code-inspired) ───────────────────────────
@@ -308,13 +308,7 @@ pub fn show_code_preview(code: &str) -> bool {
         // Short code — show it all in a box
         box_top(&format!("{}", format!("Code ({} lines)", count).dimmed()));
         for line in &lines {
-            let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
-                let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
-                format!("{}…", cut)
-            } else {
-                line.to_string()
-            };
-            box_line(&truncated.dimmed().to_string());
+            box_line(&line.dimmed().to_string());
         }
         box_bottom();
         return false;
@@ -325,13 +319,7 @@ pub fn show_code_preview(code: &str) -> bool {
 
     // First 5 lines
     for line in lines.iter().take(5) {
-        let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
-            let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
-            format!("{}…", cut)
-        } else {
-            line.to_string()
-        };
-        box_line(&truncated.dimmed().to_string());
+        box_line(&line.dimmed().to_string());
     }
 
     // Collapsed section
@@ -344,13 +332,7 @@ pub fn show_code_preview(code: &str) -> bool {
 
     // Last 3 lines
     for line in lines.iter().skip(count - 3) {
-        let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
-            let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
-            format!("{}…", cut)
-        } else {
-            line.to_string()
-        };
-        box_line(&truncated.dimmed().to_string());
+        box_line(&line.dimmed().to_string());
     }
 
     box_bottom();
@@ -372,14 +354,7 @@ pub fn show_code_preview(code: &str) -> bool {
         ));
         for (i, line) in lines.iter().enumerate() {
             let line_num = format!("{:>4}", i + 1).dimmed();
-
-            let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 8 {
-                let (cut, _) = line.unicode_truncate(BOX_WIDTH - 9);
-                format!("{}…", cut)
-            } else {
-                line.to_string()
-            };
-            box_line(&format!("{} {}", line_num, truncated.dimmed()));
+            box_line(&format!("{} {}", line_num, line.dimmed()));
         }
         box_bottom();
         return true;
@@ -434,14 +409,7 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
             ));
             box_empty();
             for line in chunk.explanation.lines() {
-                let line_str: &str = line;
-                let display = if UnicodeWidthStr::width(line_str) > BOX_WIDTH - 4 {
-                    let (cut, _) = line.unicode_truncate(BOX_WIDTH - 5);
-                    format!("{}…", cut)
-                } else {
-                    line.to_string()
-                };
-                box_line(&format!("  {}", display));
+                box_line(&format!("  {}", line));
             }
         }
         box_bottom();
