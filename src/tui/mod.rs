@@ -101,14 +101,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                             }
                             
                             if !input.trim().is_empty() {
-                                // Before starting new request, archive old results to history
-                                if !app.result_buffer.is_empty() {
-                                    app.history.push(crate::tui::app::HistoryEntry {
-                                        is_user: false,
-                                        text: app.result_buffer.clone(),
-                                    });
-                                    app.result_buffer.clear();
-                                }
+                                // Clear history so we're strictly focusing on the current task
+                                app.history.clear();
+                                app.result_buffer.clear();
                                 
                                 // Push user input to history (truncate for display if it's too long)
                                 let display_text = if input.lines().count() > 5 {

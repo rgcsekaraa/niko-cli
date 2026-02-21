@@ -159,8 +159,12 @@ fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
         ]));
     }
 
-    let total_lines = history_text.lines.len() as u16;
-    let max_scroll = total_lines.saturating_sub(area.height);
+    let mut total_visual_lines = 0;
+    for line in &history_text.lines {
+        let w = line.width() as u16;
+        total_visual_lines += 1 + w.saturating_sub(1) / area.width.max(1);
+    }
+    let max_scroll = total_visual_lines.saturating_sub(area.height);
 
     let current_scroll = if app.is_loading {
         // Auto-scroll to bottom of the stream
