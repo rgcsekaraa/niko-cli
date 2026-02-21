@@ -1,162 +1,236 @@
+use super::app::{App, Focus, Route};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-use super::app::{App, Focus, Route};
 
-/// Main draw function, dispatches to specific views
 pub fn draw(f: &mut Frame, app: &mut App) {
-    let chunks = Layout::default()
+    let input_lines = app.input_buffer.lines().len() as u16;
+    let input_height = input_lines.clamp(1, 6) + 2;
+
+    let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Header
-            Constraint::Min(0),    // Content / Output History
-            Constraint::Length(1), // Divider
-            Constraint::Length(3), // Input Area (more compact)
-            Constraint::Length(1), // Footer (Keybinds)
+            Constraint::Length(2),
+            Constraint::Min(8),
+            Constraint::Length(input_height),
+            Constraint::Length(1),
         ])
         .split(f.area());
 
-    match app.route {
-        Route::Menu => {
-            draw_header(f, app, chunks[0]);
-            draw_menu(f, app, chunks[1]);
-            draw_footer(f, app, chunks[4]);
-        }
-        Route::Main | Route::Settings | Route::Processing => {
-            draw_header(f, app, chunks[0]);
-            draw_output_history(f, app, chunks[1]);
-            draw_divider(f, chunks[2]);
-            draw_input_area(f, app, chunks[3]);
-            draw_footer(f, app, chunks[4]);
-        }
+    draw_header(f, app, layout[0]);
+
+    let body_chunks = if layout[1].width >= 120 {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(72), Constraint::Percentage(28)])
+            .split(layout[1])
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(100), Constraint::Length(0)])
+            .split(layout[1])
+    };
+
+    draw_output_history(f, app, body_chunks[0]);
+    if body_chunks[1].width > 0 {
+        draw_sidebar(f, app, body_chunks[1]);
+    }
+
+    draw_input_area(f, app, layout[2]);
+    draw_footer(f, app, layout[3]);
+
+    if app.show_help {
+        draw_help_overlay(f, app);
     }
 }
 
-fn draw_header(f: &mut Frame, _app: &App, area: Rect) {
-    let header = Line::from(vec![
-        Span::styled(" ● ", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
-        Span::styled("NIKO", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-        Span::styled(" v", Style::default().fg(Color::DarkGray)),
-        Span::styled(env!("CARGO_PKG_VERSION"), Style::default().fg(Color::Cyan)),
-        Span::styled(" — Minimalist AI Agent", Style::default().fg(Color::DarkGray)),
+fn draw_header(f: &mut Frame, app: &App, area: Rect) {
+    let pulse = [Color::Cyan, Color::LightBlue, Color::Blue, Color::Magenta];
+    let c = pulse[(app.spinner_state as usize / 2) % pulse.len()];
+
+    let status = match app.route {
+        Route::Processing => "PROCESSING",
+        Route::Settings => "SETTINGS",
+        Route::Chat => "CHAT",
+    };
+
+    let line1 = Line::from(vec![
+        Span::styled(
+            " NIKO ",
+            Style::default()
+                .fg(Color::Black)
+                .bg(c)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" v{}  ", env!("CARGO_PKG_VERSION")),
+            Style::default().fg(Color::DarkGray),
+        ),
+        Span::styled(
+            format!("{}  ", status),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
     ]);
-    f.render_widget(Paragraph::new(header), area);
+
+    let line2 = Line::from(vec![
+        Span::styled(" ", Style::default()),
+        Span::styled(&app.status_line, Style::default().fg(Color::Gray)),
+    ]);
+
+    f.render_widget(Paragraph::new(Text::from(vec![line1, line2])), area);
 }
 
-fn draw_divider(f: &mut Frame, area: Rect) {
-    let repeat = (area.width as usize).saturating_div(3);
-    let rule = Paragraph::new("───".repeat(repeat)).dim();
-    f.render_widget(rule, area);
+fn draw_sidebar(f: &mut Frame, app: &App, area: Rect) {
+    let last_ms = app.last_latency_ms.unwrap_or(0);
+    let rag = if app.rag_enabled { "on" } else { "off" };
+    let pending = app.pending_command.as_ref().map(|_| "yes").unwrap_or("no");
+    let running = if app.command_running { "yes" } else { "no" };
+    let pid = app
+        .command_pid
+        .map(|p| p.to_string())
+        .unwrap_or_else(|| "-".to_string());
+    let planner = if app.planner_steps.is_empty() {
+        "none".to_string()
+    } else {
+        format!("{}/{}", app.planner_cursor, app.planner_steps.len())
+    };
+    let index_files = app
+        .workspace_index
+        .as_ref()
+        .map(|i| i.indexed_files.to_string())
+        .unwrap_or_else(|| "0".to_string());
+
+    let sidebar = vec![
+        Line::from(vec![Span::styled(
+            "Session",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(format!("messages: {}", app.history.len())),
+        Line::from(format!("responses: {}", app.total_responses)),
+        Line::from(format!("output chars: {}", app.total_output_chars)),
+        Line::from(format!("last latency: {} ms", last_ms)),
+        Line::from(format!("rag: {}", rag)),
+        Line::from(format!("pending cmd: {}", pending)),
+        Line::from(format!("command running: {}", running)),
+        Line::from(format!("command pid: {}", pid)),
+        Line::from(format!("index files: {}", index_files)),
+        Line::from(format!("plan progress: {}", planner)),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "Navigation",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from("Tab switch focus"),
+        Line::from("PgUp/PgDn scroll"),
+        Line::from("Home/End jump"),
+        Line::from("Ctrl+L clear"),
+        Line::from("F1/? help"),
+    ];
+
+    f.render_widget(
+        Paragraph::new(sidebar)
+            .block(
+                Block::default()
+                    .title("Panel")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
-    let mode_text = if app.focus == Focus::Input {
-        Span::styled(" INSERT ", Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD))
+    let mode = if app.focus == Focus::Input {
+        Span::styled(
+            " INSERT ",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        )
     } else {
-        Span::styled(" SCROLL ", Style::default().fg(Color::Black).bg(Color::Magenta).add_modifier(Modifier::BOLD))
+        Span::styled(
+            " SCROLL ",
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        )
     };
 
-    let binds = match app.route {
-        Route::Menu => " 1:Cmd 2:Explain 3:Settings q:Quit ",
-        Route::Main => " Tab:Switch Esc:Menu Enter:Submit PgUp/Dn:Scroll ",
-        Route::Processing => " Processing... Please wait ",
-        Route::Settings => " Enter:Submit Esc:Menu ",
-    };
-
+    let hints = " /help /search /open /plan /next /run /approve /stop /index /rag on|off ";
     let footer = Line::from(vec![
-        mode_text,
-        Span::styled(binds, Style::default().fg(Color::DarkGray)),
+        mode,
+        Span::styled(hints, Style::default().fg(Color::DarkGray)),
     ]);
-    f.render_widget(Paragraph::new(footer).alignment(Alignment::Right), area);
-}
-
-fn draw_menu(f: &mut Frame, app: &mut App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2), // Logo/Title spanning
-            Constraint::Min(0),
-        ])
-        .split(area);
-
-    let title = Paragraph::new(vec![
-        Line::from(vec![
-            Span::styled(" Niko v", Style::default().fg(Color::DarkGray)),
-            Span::styled(env!("CARGO_PKG_VERSION"), Style::default().fg(Color::Cyan)),
-            Span::styled(" — Minimalist AI Assistant", Style::default().fg(Color::DarkGray)),
-        ]),
-        Line::from(""),
-    ]);
-    f.render_widget(title, chunks[0]);
-
-    let items = [
-        ListItem::new("  1. Generate Command"),
-        ListItem::new("  2. Explain Code"),
-        ListItem::new("  3. Settings"),
-        ListItem::new("  q. Quit"),
-    ];
-
-    let list = List::new(items)
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan))
-        .highlight_symbol(" ❯ ");
-
-    f.render_stateful_widget(list, chunks[1], &mut app.menu_state);
+    f.render_widget(Paragraph::new(footer).alignment(Alignment::Left), area);
 }
 
 fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
     let mut history_text = Text::default();
-    
-    // Welcome message if history is empty
-    if app.history.is_empty() && app.result_buffer.is_empty() && app.streaming_buffer.is_empty() && !app.is_loading {
-        let welcome = match app.route {
-            Route::Main => " Ready to assist. Type a command or paste code.",
-            Route::Settings => " Enter configuration changes for your provider.",
-            _ => " Awaiting input...",
-        };
-        history_text.lines.push(Line::from(vec![
-            Span::styled(welcome, Style::default().fg(Color::DarkGray)),
-        ]));
+
+    if app.history.is_empty()
+        && app.result_buffer.is_empty()
+        && app.streaming_buffer.is_empty()
+        && !app.is_loading
+    {
+        history_text.lines.push(Line::from(vec![Span::styled(
+            " Ready. Ask anything, attach files with @path, or run /help.",
+            Style::default().fg(Color::DarkGray),
+        )]));
     }
 
-    // Render stored history
     for entry in &app.history {
         if entry.is_user {
             history_text.lines.push(Line::from(vec![
-                Span::styled(" ❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                Span::styled(&entry.text, Style::default().fg(Color::White)),
+                Span::styled(" You ", Style::default().fg(Color::Black).bg(Color::Cyan)),
+                Span::styled(" ", Style::default()),
             ]));
-        } else {
             for line in entry.text.lines() {
-                history_text.lines.push(line_to_spans(line, true));
+                history_text.lines.push(Line::from(line.to_string()));
+            }
+        } else {
+            history_text.lines.push(Line::from(vec![Span::styled(
+                " Niko ",
+                Style::default().fg(Color::Black).bg(Color::Green),
+            )]));
+            let mut in_code = false;
+            for line in entry.text.lines() {
+                history_text
+                    .lines
+                    .push(parse_markdown_line(line, &mut in_code));
             }
         }
         history_text.lines.push(Line::from(""));
     }
 
-    // Render current result buffer (last response)
-    if !app.result_buffer.is_empty() {
-        for line in app.result_buffer.lines() {
-            history_text.lines.push(line_to_spans(line, true));
-        }
-    }
-
-    // Render streaming buffer if loading
     if app.is_loading {
         let dots = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let spinner_char = dots[(app.spinner_state / 2 % 10) as usize];
-        
+        let spinner_char = dots[(app.spinner_state as usize / 2) % dots.len()];
+
         if !app.streaming_buffer.is_empty() {
+            let mut in_code = false;
             for line in app.streaming_buffer.lines() {
-                history_text.lines.push(line_to_spans(line, true));
+                history_text
+                    .lines
+                    .push(parse_markdown_line(line, &mut in_code));
             }
         }
-        history_text.lines.push(Line::from(vec![
-            Span::styled(format!("  {} Processing...", spinner_char), Style::default().fg(Color::Magenta)),
-        ]));
+        history_text.lines.push(Line::from(vec![Span::styled(
+            format!(" {} thinking...", spinner_char),
+            Style::default().fg(Color::Yellow),
+        )]));
     }
 
     let mut total_visual_lines = 0;
@@ -164,71 +238,91 @@ fn draw_output_history(f: &mut Frame, app: &App, area: Rect) {
         let w = line.width() as u16;
         total_visual_lines += 1 + w.saturating_sub(1) / area.width.max(1);
     }
-    let max_scroll = total_visual_lines.saturating_sub(area.height);
+    let max_scroll = total_visual_lines.saturating_sub(area.height.saturating_sub(2));
 
     let current_scroll = if app.is_loading {
-        // Auto-scroll to bottom of the stream
         max_scroll
     } else {
-        // Otherwise, allow manual scrolling, but clamp to max
         app.result_scroll.min(max_scroll)
     };
 
-    let p = Paragraph::new(history_text)
-        .wrap(Wrap { trim: false })
-        .scroll((current_scroll, 0));
-        
-    f.render_widget(p, area);
+    f.render_widget(
+        Paragraph::new(history_text)
+            .wrap(Wrap { trim: false })
+            .scroll((current_scroll, 0))
+            .block(
+                Block::default()
+                    .title("Conversation")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            ),
+        area,
+    );
 }
 
-/// Convert a markdown-lite line to styled spans
-fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
+fn parse_markdown_line<'a>(line: &'a str, in_code_block: &mut bool) -> Line<'a> {
+    let line_trim = line.trim();
+
+    if line_trim.starts_with("```") {
+        *in_code_block = !*in_code_block;
+        if *in_code_block {
+            return Line::from(vec![Span::styled(
+                " ┌ code",
+                Style::default().fg(Color::DarkGray),
+            )]);
+        }
+        return Line::from(vec![Span::styled(
+            " └",
+            Style::default().fg(Color::DarkGray),
+        )]);
+    }
+
+    if *in_code_block {
+        return Line::from(vec![
+            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::styled(line, Style::default().fg(Color::Cyan)),
+        ]);
+    }
+
     let mut spans = Vec::new();
     let mut current_pos = 0;
-    let line_clean = line.replace('\n', "").replace('\r', "");
-    let line_trim = line_clean.trim();
 
-    // Check for headers
     if line_trim.starts_with("#") {
-        let _level = line_trim.chars().take_while(|&c| c == '#').count();
         let text = line_trim.trim_start_matches('#').trim();
         spans.push(Span::styled(
             format!(" {} ", text.to_uppercase()),
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
         ));
         return Line::from(spans);
     }
 
-    // Bullet points
     if line_trim.starts_with("- ") || line_trim.starts_with("* ") {
-        spans.push(Span::styled(" • ", Style::default().fg(Color::Cyan)));
-        current_pos = line_clean.find(|c| c == '-' || c == '*').unwrap() + 2;
-    } else {
-        spans.push(Span::from("  "));
+        spans.push(Span::styled(" • ", Style::default().fg(Color::Yellow)));
+        current_pos = line.find(|c| c == '-' || c == '*').unwrap_or(0) + 2;
     }
 
-    let remaining = &line_clean[current_pos..];
-    
-    // Simple bold/code parsing
-    let mut i = 0;
+    let remaining = &line[current_pos..];
     let chars: Vec<char> = remaining.chars().collect();
+    let mut i = 0;
     let mut text_start = 0;
 
     while i < chars.len() {
-        if i + 1 < chars.len() && chars[i] == '*' && chars[i+1] == '*' {
-            // Flush normal text
+        if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*' {
             if i > text_start {
                 spans.push(Span::from(chars[text_start..i].iter().collect::<String>()));
             }
-            // Find end of bold
             let mut j = i + 2;
-            while j + 1 < chars.len() && !(chars[j] == '*' && chars[j+1] == '*') {
+            while j + 1 < chars.len() && !(chars[j] == '*' && chars[j + 1] == '*') {
                 j += 1;
             }
             if j + 1 < chars.len() {
                 spans.push(Span::styled(
-                    chars[i+2..j].iter().collect::<String>(),
-                    Style::default().add_modifier(Modifier::BOLD).fg(Color::White)
+                    chars[i + 2..j].iter().collect::<String>(),
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .fg(Color::White),
                 ));
                 i = j + 2;
                 text_start = i;
@@ -245,8 +339,8 @@ fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
             }
             if j < chars.len() {
                 spans.push(Span::styled(
-                    chars[i+1..j].iter().collect::<String>(),
-                    Style::default().fg(Color::Magenta)
+                    chars[i + 1..j].iter().collect::<String>(),
+                    Style::default().fg(Color::Green),
                 ));
                 i = j + 1;
                 text_start = i;
@@ -267,23 +361,94 @@ fn line_to_spans(line: &str, _is_agent: bool) -> Line<'_> {
 
 fn draw_input_area(f: &mut Frame, app: &mut App, area: Rect) {
     let focus_style = if app.focus == Focus::Input {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(Color::White)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
     app.input_buffer.set_block(
         Block::default()
-            .borders(Borders::NONE)
+            .title("Prompt")
+            .borders(Borders::ALL)
+            .border_style(if app.focus == Focus::Input {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            }),
     );
     app.input_buffer.set_style(focus_style);
-    
-    // Add a small prompt icon
-    let input_chunks = Layout::default()
+
+    f.render_widget(&app.input_buffer, area);
+}
+
+fn draw_help_overlay(f: &mut Frame, app: &App) {
+    let popup = centered_rect(70, 70, f.area());
+
+    let text = Text::from(vec![
+        Line::from(Span::styled(
+            "Niko Commands",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from("/help            Toggle this help"),
+        Line::from("/providers       List configured providers"),
+        Line::from("/provider <name> Switch active provider"),
+        Line::from("/models [name]   List provider models"),
+        Line::from("/model <id>      Set active model"),
+        Line::from("/index           Build/rebuild workspace index"),
+        Line::from("/search <q>      Search files in index"),
+        Line::from("/open <path>     Preview file in chat"),
+        Line::from("/plan <task>     Build task plan"),
+        Line::from("/next            Show next planned step"),
+        Line::from("/rag on|off      Enable or disable retrieval"),
+        Line::from("/run <cmd>       Stage shell command"),
+        Line::from("/approve         Execute staged command"),
+        Line::from("/stop            Stop running command"),
+        Line::from("/deny            Cancel staged command"),
+        Line::from("/stats           Session metrics"),
+        Line::from("/clear           Clear conversation"),
+        Line::from(""),
+        Line::from("Tip: use @path/to/file in prompts to attach files."),
+        Line::from("Esc closes this panel."),
+        Line::from(format!(
+            "RAG currently: {}",
+            if app.rag_enabled { "on" } else { "off" }
+        )),
+    ]);
+
+    f.render_widget(Clear, popup);
+    f.render_widget(
+        Paragraph::new(text)
+            .block(
+                Block::default()
+                    .title("Help")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::LightBlue)),
+            )
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: false }),
+        popup,
+    );
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
-        .split(area);
-    
-    f.render_widget(Paragraph::new(" ❯ ").fg(Color::Cyan), input_chunks[0]);
-    f.render_widget(&app.input_buffer, input_chunks[1]);
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
 }

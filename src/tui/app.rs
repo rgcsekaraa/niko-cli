@@ -1,25 +1,37 @@
 use std::time::Instant;
 
-use ratatui::{style::Style, widgets::ListState};
+use ratatui::style::Style;
 use tui_textarea::TextArea;
-// use crate::chunker::ExplainResult;
-// cyclic dependency if I import ExplainResult here? No, app.rs is part of tui mod.
-// But ExplainResult is in chunker.rs.
-// I need `use crate::chunker::ExplainResult;`
 
-use crate::chunker::ExplainResult;
+use crate::tui::workspace::WorkspaceIndex;
 
 #[derive(Debug, Clone)]
 pub enum TuiMessage {
     Token(String),
-    CmdResult(Result<String, String>),
-    ExplainResult(Result<ExplainResult, String>),
+    StreamFinished {
+        latency_ms: u128,
+        output_chars: usize,
+    },
+    Error(String),
+    WarmupStatus(String),
+    WorkspaceIndexReady {
+        index: WorkspaceIndex,
+        source: String,
+    },
+    CommandStarted {
+        pid: u32,
+        cmd: String,
+    },
+    CommandStream(String),
+    CommandOutput {
+        cmd: String,
+        output: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Route {
-    Menu,
-    Main,      // Unified view for Cmd, Explain, etc.
+    Chat,
     Processing,
     Settings,
 }
@@ -48,22 +60,30 @@ pub struct App<'a> {
     pub streaming_scroll: u16,
     pub focus: Focus,
     pub history: Vec<HistoryEntry>,
-    pub menu_state: ListState,
     pub pasted_code: Option<String>,
     pub last_key_time: Instant,
+    pub show_help: bool,
+    pub status_line: String,
+    pub rag_enabled: bool,
+    pub workspace_index: Option<WorkspaceIndex>,
+    pub pending_command: Option<String>,
+    pub command_running: bool,
+    pub command_pid: Option<u32>,
+    pub planner_steps: Vec<String>,
+    pub planner_cursor: usize,
+    pub total_responses: u64,
+    pub total_output_chars: u64,
+    pub last_latency_ms: Option<u128>,
 }
 
 impl<'a> Default for App<'a> {
     fn default() -> Self {
         let mut textarea = TextArea::default();
-        textarea.set_placeholder_text("Type something...");
+        textarea.set_placeholder_text("Type a message or paste code...");
         textarea.set_cursor_line_style(Style::default()); // No highlight line by default
 
-        let mut menu_state = ListState::default();
-        menu_state.select(Some(0)); // default to first item
-
         Self {
-            route: Route::Menu,
+            route: Route::Chat,
             input_buffer: textarea,
             is_loading: false,
             spinner_state: 0,
@@ -74,9 +94,20 @@ impl<'a> Default for App<'a> {
             streaming_scroll: 0,
             focus: Focus::Input,
             history: Vec::new(),
-            menu_state,
             pasted_code: None,
             last_key_time: std::time::Instant::now(),
+            show_help: false,
+            status_line: "Ready".to_string(),
+            rag_enabled: true,
+            workspace_index: None,
+            pending_command: None,
+            command_running: false,
+            command_pid: None,
+            planner_steps: Vec::new(),
+            planner_cursor: 0,
+            total_responses: 0,
+            total_output_chars: 0,
+            last_latency_ms: None,
         }
     }
 }
@@ -98,9 +129,9 @@ impl<'a> App<'a> {
         self.pasted_code = None;
 
         match self.route {
-            Route::Main => self
+            Route::Chat => self
                 .input_buffer
-                .set_placeholder_text("Type a command or paste code (Ctrl+D or Enter)..."),
+                .set_placeholder_text("Type a message or paste code (Double Enter to submit)..."),
             _ => {}
         }
     }
