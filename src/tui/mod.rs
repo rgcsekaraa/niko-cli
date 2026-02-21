@@ -115,7 +115,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             Event::Tick => {
                 app.on_tick();
             }
-            Event::Resize(_, _) => {
+            Event::Resize => {
                 // Ratatui handles resize automatically
             }
             Event::AppMessage(msg) => {
@@ -156,9 +156,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                                 app.set_route(Route::ResultView);
                             }
                         }
-                    }
-                    TuiMessage::Finished => {
-                        app.is_loading = false;
                     }
                 }
             }

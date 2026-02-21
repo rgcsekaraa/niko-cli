@@ -1204,6 +1204,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tui-textarea",
  "unicode-truncate 2.0.1",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]

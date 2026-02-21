@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use colored::*;
 use unicode_truncate::UnicodeTruncateStr;
+use unicode_width::UnicodeWidthStr;
 
 // ─── Box-drawing constants (Claude Code-inspired) ───────────────────────────
 
@@ -81,17 +82,29 @@ pub fn box_empty() {
 }
 
 /// Draw a line inside a box with content (left-aligned with 2-char indent)
+/// Content that exceeds BOX_WIDTH is automatically truncated with "…"
 pub fn box_line(content: &str) {
+    // Available width for content: BOX_WIDTH minus the leading space (1 char) and trailing space (1 char)
+    let max_content_width = BOX_WIDTH - 2;
     let plain_len = strip_ansi_len(content);
-    let padding = if BOX_WIDTH > plain_len + 2 {
-        BOX_WIDTH - plain_len - 2
+
+    let (display_content, display_len) = if plain_len > max_content_width {
+        let truncated = truncate_ansi(content, max_content_width.saturating_sub(1));
+        let tlen = strip_ansi_len(&truncated);
+        (format!("{}…", truncated), tlen + 1)
+    } else {
+        (content.to_string(), plain_len)
+    };
+
+    let padding = if max_content_width > display_len {
+        max_content_width - display_len
     } else {
         0
     };
     eprintln!(
-        "{} {}{}{}",
+        "{} {} {}{}",
         BOX_V.dimmed(),
-        content,
+        display_content,
         " ".repeat(padding),
         BOX_V.dimmed()
     );
@@ -243,28 +256,18 @@ pub fn read_stdin_input() -> io::Result<String> {
     eprintln!();
     box_top(&"Paste Code".bold().to_string());
     box_line(
-        &"Paste your code below. Press Ctrl-D or two empty lines to finish."
+        &"Paste your code below. Press Ctrl-D to finish."
             .dimmed()
             .to_string(),
     );
     box_sep();
 
     let mut lines = Vec::new();
-    let mut consecutive_empty = 0;
     let reader = stdin.lock();
 
     for line in reader.lines() {
         let line = line?;
-        if line.is_empty() {
-            consecutive_empty += 1;
-            if consecutive_empty >= 2 {
-                break;
-            }
-            lines.push(line);
-        } else {
-            consecutive_empty = 0;
-            lines.push(line);
-        }
+        lines.push(line);
 
         // Update live counter on stderr (overwrite the same line)
         eprint!(
@@ -305,7 +308,7 @@ pub fn show_code_preview(code: &str) -> bool {
         // Short code — show it all in a box
         box_top(&format!("{}", format!("Code ({} lines)", count).dimmed()));
         for line in &lines {
-            let truncated = if line.len() > BOX_WIDTH - 3 {
+            let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
                 let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
                 format!("{}…", cut)
             } else {
@@ -322,7 +325,7 @@ pub fn show_code_preview(code: &str) -> bool {
 
     // First 5 lines
     for line in lines.iter().take(5) {
-        let truncated = if line.len() > BOX_WIDTH - 3 {
+        let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
             let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
             format!("{}…", cut)
         } else {
@@ -341,7 +344,7 @@ pub fn show_code_preview(code: &str) -> bool {
 
     // Last 3 lines
     for line in lines.iter().skip(count - 3) {
-        let truncated = if line.len() > BOX_WIDTH - 3 {
+        let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 3 {
             let (cut, _) = line.unicode_truncate(BOX_WIDTH - 4);
             format!("{}…", cut)
         } else {
@@ -370,7 +373,7 @@ pub fn show_code_preview(code: &str) -> bool {
         for (i, line) in lines.iter().enumerate() {
             let line_num = format!("{:>4}", i + 1).dimmed();
 
-            let truncated = if line.len() > BOX_WIDTH - 8 {
+            let truncated = if UnicodeWidthStr::width(*line) > BOX_WIDTH - 8 {
                 let (cut, _) = line.unicode_truncate(BOX_WIDTH - 9);
                 format!("{}…", cut)
             } else {
@@ -431,7 +434,8 @@ pub fn display_explanation(result: &crate::chunker::ExplainResult) {
             ));
             box_empty();
             for line in chunk.explanation.lines() {
-                let display = if line.len() > BOX_WIDTH - 4 {
+                let line_str: &str = line;
+                let display = if UnicodeWidthStr::width(line_str) > BOX_WIDTH - 4 {
                     let (cut, _) = line.unicode_truncate(BOX_WIDTH - 5);
                     format!("{}…", cut)
                 } else {
@@ -494,7 +498,7 @@ pub fn prompt_input(prompt: &str) -> io::Result<String> {
 
 /// Get the display length of a string, stripping ANSI escape codes
 fn strip_ansi_len(s: &str) -> usize {
-    let mut len = 0;
+    let mut plain = String::new();
     let mut in_escape = false;
     for c in s.chars() {
         if c == '\x1b' {
@@ -504,8 +508,45 @@ fn strip_ansi_len(s: &str) -> usize {
                 in_escape = false;
             }
         } else {
-            len += 1;
+            plain.push(c);
         }
     }
-    len
+    UnicodeWidthStr::width(plain.as_str())
+}
+
+/// Truncate a string that may contain ANSI escape codes to a maximum display width.
+/// Preserves ANSI codes (they don't count towards width) and handles multi-byte UTF-8.
+/// Returns the truncated string with an ANSI reset appended if any escape was active.
+fn truncate_ansi(s: &str, max_width: usize) -> String {
+    let mut result = String::new();
+    let mut width = 0;
+    let mut in_escape = false;
+    let mut had_escape = false;
+
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+            had_escape = true;
+            result.push(c);
+        } else if in_escape {
+            result.push(c);
+            if c == 'm' {
+                in_escape = false;
+            }
+        } else {
+            let cw = unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+            if width + cw > max_width {
+                break;
+            }
+            result.push(c);
+            width += cw;
+        }
+    }
+
+    // Reset ANSI styling if we had any escape codes
+    if had_escape {
+        result.push_str("\x1b[0m");
+    }
+
+    result
 }

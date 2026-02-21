@@ -28,6 +28,7 @@ ratatui = "0.29.0"
 crossterm = "0.28.0"
 tui-textarea = "0.7.0"
 unicode-truncate = "2.0.1"
+unicode-width = "0.2"
 
 [profile.release]
 opt-level = "z"

@@ -160,7 +160,7 @@ fn draw_result(f: &mut Frame, app: &mut App) {
     f.render_widget(help, chunks[1]);
 }
 
-fn draw_settings(f: &mut Frame, f_app: &mut App) {
+fn draw_settings(f: &mut Frame, _f_app: &mut App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Settings (TUI) ");

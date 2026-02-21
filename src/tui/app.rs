@@ -11,7 +11,6 @@ pub enum TuiMessage {
     Token(String),
     CmdResult(Result<String, String>),
     ExplainResult(Result<ExplainResult, String>),
-    Finished,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +26,6 @@ pub enum Route {
 pub struct App<'a> {
     pub route: Route,
     pub input_buffer: TextArea<'a>,
-    pub messages: Vec<String>,
     pub is_loading: bool,
     pub spinner_state: u8,
     pub exit: bool,
@@ -43,7 +41,6 @@ impl<'a> Default for App<'a> {
         Self {
             route: Route::Menu,
             input_buffer: textarea,
-            messages: Vec::new(),
             is_loading: false,
             spinner_state: 0,
             exit: false,

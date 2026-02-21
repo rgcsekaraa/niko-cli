@@ -13,7 +13,7 @@ use crate::tui::app::TuiMessage;
 pub enum Event {
     Tick,
     Key(KeyEvent),
-    Resize(u16, u16),
+    Resize,
     AppMessage(TuiMessage),
 }
 
@@ -45,9 +45,9 @@ impl EventHandler {
                                     .expect("failed to send key event");
                             }
                         }
-                        CrosstermEvent::Resize(w, h) => {
+                        CrosstermEvent::Resize(_, _) => {
                             handler_sender
-                                .send(Event::Resize(w, h))
+                                .send(Event::Resize)
                                 .expect("failed to send resize event");
                         }
                         _ => {}
