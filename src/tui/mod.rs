@@ -70,25 +70,26 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                             app.input_buffer.input(key);
                         }
                     },
-                    Route::ExplainInput => match key.code {
-                        KeyCode::Esc => app.set_route(Route::Menu),
-                        KeyCode::Char('d')
-                            if key
-                                .modifiers
-                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                        {
-                            // Submit on Ctrl+D
+                    Route::ExplainInput => {
+                        if key.code == KeyCode::Esc {
+                            app.set_route(Route::Menu);
+                        } else if key.code == KeyCode::Tab {
+                            use crate::tui::app::Focus;
+                            app.focus = if app.focus == Focus::Left { Focus::Right } else { Focus::Left };
+                        } else if key.code == KeyCode::Char('d') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
                             submit_explain(&mut app, &events.sender);
-                        }
-                        KeyCode::Enter => {
-                            // Single enter adds newline. Maybe strict "Ctrl+D" or "Alt+Enter" to submit?
-                            // Or heuristic: if ends with two newlines?
-                            // For Tui-textarea, Enter just adds newline.
-                            // Let's stick to Ctrl+D as primary submit for multiline paste.
-                            app.input_buffer.input(key);
-                        }
-                        _ => {
-                            app.input_buffer.input(key);
+                        } else {
+                            // Focus-based routing
+                            use crate::tui::app::Focus;
+                            if app.focus == Focus::Right {
+                                match key.code {
+                                    KeyCode::Up => app.streaming_scroll = app.streaming_scroll.saturating_sub(1),
+                                    KeyCode::Down => app.streaming_scroll = app.streaming_scroll.saturating_add(1),
+                                    _ => {}
+                                }
+                            } else {
+                                app.input_buffer.input(key);
+                            }
                         }
                     },
                     Route::Processing => {
@@ -149,11 +150,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                                     explanation.overall_summary,
                                     explanation.follow_up_questions.join("\n- ")
                                 );
-                                app.set_route(Route::ResultView);
                             }
                             Err(e) => {
                                 app.result_buffer = format!("Error: {}", e);
-                                app.set_route(Route::ResultView);
                             }
                         }
                     }
@@ -185,8 +184,10 @@ fn submit_explain(app: &mut App, sender: &std::sync::mpsc::Sender<Event>) {
     }
 
     app.is_loading = true;
-    app.set_route(Route::Processing);
     app.streaming_buffer.clear();
+    app.result_buffer.clear();
+    use crate::tui::app::Focus;
+    app.focus = Focus::Right;
 
     let sender_token = sender.clone();
     let sender_final = sender.clone();

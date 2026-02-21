@@ -23,6 +23,12 @@ pub enum Route {
     Settings,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Focus {
+    Left,
+    Right,
+}
+
 pub struct App<'a> {
     pub route: Route,
     pub input_buffer: TextArea<'a>,
@@ -30,7 +36,10 @@ pub struct App<'a> {
     pub spinner_state: u8,
     pub exit: bool,
     pub result_buffer: String,
-    pub streaming_buffer: String, // New field for streaming token accumulator
+    pub streaming_buffer: String,
+    pub result_scroll: u16,
+    pub streaming_scroll: u16,
+    pub focus: Focus,
 }
 
 impl<'a> Default for App<'a> {
@@ -46,6 +55,9 @@ impl<'a> Default for App<'a> {
             exit: false,
             result_buffer: String::new(),
             streaming_buffer: String::new(),
+            result_scroll: 0,
+            streaming_scroll: 0,
+            focus: Focus::Left,
         }
     }
 }
@@ -58,8 +70,11 @@ impl<'a> App<'a> {
     pub fn set_route(&mut self, route: Route) {
         self.route = route;
         self.input_buffer = TextArea::default();
-        self.streaming_buffer.clear(); // Clear streaming buffer on route change
+        self.streaming_buffer.clear();
         self.result_buffer.clear();
+        self.result_scroll = 0;
+        self.streaming_scroll = 0;
+        self.focus = Focus::Left;
 
         match self.route {
             Route::CmdInput => self
