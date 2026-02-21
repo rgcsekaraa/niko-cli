@@ -71,7 +71,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         } else if key.code == KeyCode::Tab {
                             app.focus = if app.focus == Focus::Input { Focus::Output } else { Focus::Input };
                         } else if key.code == KeyCode::Enter && app.focus == Focus::Input {
-                            let input = app.input_buffer.lines().join("\n");
+                            let mut input = app.input_buffer.lines().join("\n");
+                            
+                            // Combine with pasted code if it exists
+                            if let Some(pasted) = app.pasted_code.take() {
+                                input = format!("{}\n\n{}", input.trim(), pasted);
+                            }
+                            
                             if !input.trim().is_empty() {
                                 // Before starting new request, archive old results to history
                                 if !app.result_buffer.is_empty() {
@@ -82,15 +88,22 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                                     app.result_buffer.clear();
                                 }
                                 
-                                // Push user input to history
+                                // Push user input to history (truncate for display if it's too long)
+                                let display_text = if input.lines().count() > 5 {
+                                    let first_lines = input.lines().take(3).collect::<Vec<_>>().join("\n");
+                                    format!("{}\n... [{} lines omitted]", first_lines, input.lines().count() - 3)
+                                } else {
+                                    input.clone()
+                                };
+
                                 app.history.push(crate::tui::app::HistoryEntry {
                                     is_user: true,
-                                    text: input.clone(),
+                                    text: display_text,
                                 });
 
                                 // Simple slash command detection
                                 if input.starts_with("/explain") || input.lines().count() > 1 {
-                                    submit_explain(&mut app, &events.sender);
+                                    submit_explain(&mut app, &events.sender, input);
                                 } else {
                                     let query = if input.starts_with("/cmd ") {
                                         input.trim_start_matches("/cmd ").to_string()
@@ -143,7 +156,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             }
             Event::Paste(s) => {
                 if app.route == Route::Main && app.focus == Focus::Input {
-                    app.input_buffer.insert_str(&s);
+                    let lines_count = s.lines().count();
+                    if lines_count > 1 {
+                        app.pasted_code = Some(s);
+                        app.input_buffer.insert_str(&format!("[Pasted {} lines of code — Press Enter to submit]", lines_count));
+                    } else {
+                        app.input_buffer.insert_str(&s);
+                    }
                 }
             }
             Event::Tick => {
@@ -211,8 +230,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn submit_explain(app: &mut App, sender: &std::sync::mpsc::Sender<Event>) {
-    let code = app.input_buffer.lines().join("\n");
+fn submit_explain(app: &mut App, sender: &std::sync::mpsc::Sender<Event>, code: String) {
     if code.trim().is_empty() {
         return;
     }

@@ -47,6 +47,7 @@ pub struct App<'a> {
     pub focus: Focus,
     pub history: Vec<HistoryEntry>,
     pub menu_state: ListState,
+    pub pasted_code: Option<String>,
 }
 
 impl<'a> Default for App<'a> {
@@ -71,6 +72,7 @@ impl<'a> Default for App<'a> {
             focus: Focus::Input,
             history: Vec::new(),
             menu_state,
+            pasted_code: None,
         }
     }
 }
@@ -89,6 +91,7 @@ impl<'a> App<'a> {
         self.result_scroll = 0;
         self.streaming_scroll = 0;
         self.focus = Focus::Input;
+        self.pasted_code = None;
 
         match self.route {
             Route::Main => self
